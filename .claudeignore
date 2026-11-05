@@ -1,0 +1,51 @@
+# Dependencias y entornos
+node_modules/
+.pnp
+.pnp.js
+
+# Salidas de compilación y empaquetado
+dist/
+build/
+out/
+.next/
+coverage/
+
+# Entornos y credenciales sensibles
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Archivos de bloqueo de paquetes (consumen tokens innecesarios)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Cachés y temporales de herramientas
+.git/
+.turbo/
+.cache/
+*.tsbuildinfo
+.eslintcache
+
+
+# Archivos multimedia pesados (Claude no analiza binarios locales grandes)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+*.zip
+*.tar.gz
+*.identifier
+
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

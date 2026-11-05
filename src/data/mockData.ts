@@ -1,0 +1,309 @@
+export const ROLES: Record<string, string> = {
+  ADMINISTRADOR: 'Administrador',
+  DOCENTE_RESPONSABLE: 'Docente Responsable',
+  DOCENTE_AUXILIAR: 'Docente Auxiliar',
+  UAP: 'UAP (Asesoría Pedagógica)',
+  DIRECCION_CARRERA: 'Dirección de Carrera',
+  CONSEJO_DEPARTAMENTAL: 'Consejo Departamental',
+};
+
+export interface SchemaField {
+  key: string;
+  label: string;
+  type: 'text' | 'table';
+  cols?: string[];
+  campoPath: string;
+}
+
+export interface SchemaSection {
+  title: string;
+  norm: string;
+  fields: SchemaField[];
+}
+
+export const PAAC_SCHEMA: SchemaSection[] = [
+  { title: 'A. Aspectos Generales', norm: 'A. DATOS DE ENCABEZADO Y EQUIPO DOCENTE', fields: [] },
+  {
+    title: '1. Fundamentación y Diagnóstico',
+    norm: '1. FUNDAMENTACIÓN Y DIAGNÓSTICO',
+    fields: [
+      { key: 'intro', label: '1.1. Fundamentación e importancia en el plan de estudios', type: 'text', campoPath: 'fundamentacionDiagnostico.introduccion' },
+      { key: 'diag', label: '1.2. Diagnóstico: articulación horizontal/vertical e infraestructura', type: 'text', campoPath: 'fundamentacionDiagnostico.diagnostico' },
+    ],
+  },
+  {
+    title: '2. Objetivos y Competencias',
+    norm: '2. OBJETIVOS GENERALES Y MATRIZ DE COMPETENCIAS (ORD. 448/11)',
+    fields: [
+      { key: 'concept', label: '2.1. Objetivos conceptuales', type: 'text', campoPath: 'objetivosGenerales.conceptuales' },
+      { key: 'procedure', label: '2.2. Objetivos procedimentales', type: 'text', campoPath: 'objetivosGenerales.procedimentales' },
+      { key: 'attitude', label: '2.3. Objetivos actitudinales', type: 'text', campoPath: 'objetivosGenerales.actitudinales' },
+      { key: 'competencias', label: '2.4. Matriz de Competencias (Ord. HCS 448/11 - Nivel de Aporte 0 a 3)', type: 'table', cols: ['Tipo (Genérica/Específica)', 'Descripción de la Competencia', 'Nivel Aporte (0-3)', 'Descriptores de Aprendizaje'], campoPath: 'paacCompetencias.matriz' },
+    ],
+  },
+  {
+    title: '3. Metodología de Enseñanza',
+    norm: '3. METODOLOGÍA DE ENSEÑANZA Y RECURSOS',
+    fields: [
+      { key: 'method', label: '3.1. Metodología de clases teóricas, prácticas y de laboratorio', type: 'text', campoPath: 'metodologiaEnsenanza.metodologia' },
+      { key: 'resources', label: '3.2. Recursos didácticos y entorno virtual', type: 'text', campoPath: 'metodologiaEnsenanza.recursos' },
+    ],
+  },
+  {
+    title: '4. Contenidos y Unidades',
+    norm: 'B. ASPECTOS CURRICULARES · 1. UNIDADES Y CONTENIDOS',
+    fields: [
+      { key: 'units', label: 'Unidades temáticas y desarrollo analítico', type: 'table', cols: ['Unidad', 'Contenidos Analíticos'], campoPath: 'aspectosCurriculares.unidades' },
+    ],
+  },
+  {
+    title: '5. Trabajos Prácticos y Lab.',
+    norm: '2 y 3. PROGRAMA DE TRABAJOS PRÁCTICOS Y LABORATORIO',
+    fields: [
+      { key: 'tp', label: 'Listado de Trabajos Prácticos', type: 'table', cols: ['N° / Nombre', 'Propósito / Objetivo', 'Unidades'], campoPath: 'trabajosPracticos.listado' },
+      { key: 'lab', label: 'Programa de Trabajos Prácticos de Laboratorio y Equipamiento', type: 'text', campoPath: 'trabajosPracticos.laboratorio' },
+    ],
+  },
+  {
+    title: '6. Evaluación y Régimen',
+    norm: '4. METODOLOGÍA DE EVALUACIÓN Y RÉGIMEN DE APROBACIÓN',
+    fields: [
+      { key: 'eval', label: 'Criterios e instrumentos de evaluación', type: 'text', campoPath: 'metodologiaEvaluacion.criterios' },
+      { key: 'regular', label: 'Condiciones de Regularidad', type: 'text', campoPath: 'metodologiaEvaluacion.regimenAprobacion.regular' },
+      { key: 'promotion', label: 'Condiciones de Promoción Directa', type: 'text', campoPath: 'metodologiaEvaluacion.regimenAprobacion.promocion' },
+      { key: 'free', label: 'Condiciones de Examen Libre', type: 'text', campoPath: 'metodologiaEvaluacion.regimenAprobacion.libre' },
+    ],
+  },
+  {
+    title: '7. Bibliografía y Crédito',
+    norm: '5 y 7. BIBLIOGRAFÍA Y DISTRIBUCIÓN DEL CRÉDITO HORARIO',
+    fields: [
+      { key: 'books', label: 'Bibliografía Básica y Complementaria', type: 'table', cols: ['Tipo', 'Autor/es', 'Título', 'Editorial', 'Año'], campoPath: 'bibliografia.items' },
+      { key: 'credit', label: 'Distribución del Crédito Horario', type: 'table', cols: ['Semanas', 'Unidad', 'Teoría (h)', 'Práctica (h)', 'Lab. (h)', 'Evaluación (h)'], campoPath: 'distribucionHoraria.filas' },
+    ],
+  },
+];
+
+export const PAAD_SCHEMA: SchemaSection[] = [
+  {
+    title: '1. Actividad de Enseñanza',
+    norm: '1) ACTIVIDAD DE ENSEÑANZA (Cursos atendidos y producción didáctica)',
+    fields: [
+      { key: 'material', label: '1.b) Preparación de Manuales, Guías de Trabajos Prácticos y Programas', type: 'text', campoPath: 'docenciaDirecta.preparacionMaterial' },
+      { key: 'otherTeach', label: '1.c) Otros trabajos de índole específicamente docente', type: 'text', campoPath: 'docenciaDirecta.otrosTrabajos' },
+    ],
+  },
+  {
+    title: '2. Investigación',
+    norm: '2) ACTIVIDADES DE INVESTIGACIÓN',
+    fields: [{ key: 'research', label: 'Proyectos de investigación vigentes', type: 'text', campoPath: 'investigacionExtension.investigacion' }],
+  },
+  {
+    title: '3. Formación de RRHH',
+    norm: '3) ACTIVIDAD DE FORMACIÓN DE RECURSOS HUMANOS',
+    fields: [{ key: 'human', label: 'Dirección de pasantes, adscriptos, becarios y tesistas', type: 'text', campoPath: 'formacionRrhh.actividades' }],
+  },
+  {
+    title: '4. Capacitación y Posgrado',
+    norm: '4) ACTIVIDADES DE FORMACIÓN ACADÉMICA Y ESPECIALIZACIÓN',
+    fields: [{ key: 'formation', label: 'Estudios de posgrado y cursos de perfeccionamiento', type: 'text', campoPath: 'capacitacion.formacionAcademica' }],
+  },
+  {
+    title: '5 a 7. Extensión y Gestión',
+    norm: '5, 6 y 7) EXTENSIÓN, GESTIÓN UNIVERSITARIA Y OTRAS ACTIVIDADES',
+    fields: [
+      { key: 'extension', label: 'Proyectos de extensión y vinculación tecnológica', type: 'text', campoPath: 'investigacionExtension.extension' },
+      { key: 'government', label: 'Actividades de administración y gobierno universitario', type: 'text', campoPath: 'investigacionExtension.gestion' },
+    ],
+  },
+  {
+    title: '8. Distribución Horaria',
+    norm: '8) DISTRIBUCIÓN HORARIA DE ACTIVIDADES DOCENTES',
+    fields: [
+      { key: 'scheduleTable', label: 'Resumen de carga horaria semanal y anual por función', type: 'table', cols: ['Función / Actividad', 'Ámbito / Cátedra', 'Hs. Semanales', 'Hs. Anuales'], campoPath: 'distribucionHoraria.resumen' },
+    ],
+  },
+];
+
+export const PEDITEMS = [
+  '1. Fundamentación e introducción al perfil profesional',
+  '2. Diagnóstico y articulación horizontal/vertical',
+  '3. Coherencia de Objetivos / Matriz de Competencias (Ord. 448/11)',
+  '4. Metodología de enseñanza y recursos didácticos',
+  '5. Selección y secuenciación de Unidades de Contenido',
+  '6. Programa de Trabajos Prácticos y Laboratorio',
+  '7. Metodología de Evaluación y Régimen (Regular, Promoción, Libre)',
+  '8. Bibliografía y Distribución del Crédito Horario',
+];
+
+export const DISCITEMS = [
+  '1. Correspondencia con los Contenidos Mínimos del Plan de Estudio',
+  '2. Pertinencia del Programa de Trabajos Prácticos y Laboratorio',
+  '3. Actualización y pertinencia de la Bibliografía Básica y Complementaria',
+  '4. Control individual de PAAD de los integrantes de la cátedra',
+];
+
+export function createInitialData() {
+  const sedes = [
+    { id: 'sede-cap', nombre: 'Sede Capital', esCapital: true },
+    { id: 'sede-cham', nombre: 'Sede Regional Chamical', esCapital: false },
+  ];
+  const departamentos = [
+    { id: 'depto-exactas', nombre: 'DACEFyN (Ciencias Exactas, Físicas y Naturales)', sedeId: 'sede-cap' },
+    { id: 'depto-humanas', nombre: 'Departamento de Ciencias Humanas y de la Educación', sedeId: 'sede-cap' },
+    { id: 'depto-sociales', nombre: 'Departamento de Ciencias Sociales, Jurídicas y Económicas', sedeId: 'sede-cap' },
+  ];
+  const carreras = [
+    { id: 'car-isi', codigo: 'ISI', nombre: 'Ingeniería en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-isi' },
+    { id: 'car-lsi', codigo: 'LSI', nombre: 'Licenciatura en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-lsi' },
+    { id: 'car-tui', codigo: 'TUI', nombre: 'Tecnicatura Universitaria en Informática', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-tui' },
+    { id: 'car-tui-cham', codigo: 'TUI-CHAM', nombre: 'Tecnicatura Universitaria en Informática (Chamical)', sedeId: 'sede-cham', departamentoId: null, directorId: 'u-dir-tui' },
+  ];
+  const planes = [
+    { id: 'plan-isi-448', carreraId: 'car-isi', ordenanza: 'Ord. HCS N° 448/2011', enfoque: 'COMPETENCIAS', activo: true },
+    { id: 'plan-lsi-171', carreraId: 'car-lsi', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
+    { id: 'plan-tui-171', carreraId: 'car-tui', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
+    { id: 'plan-cham-171', carreraId: 'car-tui-cham', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
+  ];
+  const asignaturas = [
+    { id: 'asig-prog1', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
+    { id: 'asig-sis1', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
+    { id: 'asig-der', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-sociales', nombre: 'Derecho Informático y Ética Profesional', anoCursada: 5, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Legislación informática, propiedad intelectual del software, delitos informáticos, protección de datos personales y deontología profesional.' },
+    { id: 'asig-bd', planEstudioId: 'plan-tui-171', departamentoRadicacionId: 'depto-exactas', nombre: 'Bases de Datos', anoCursada: 2, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Modelo Entidad-Relación, Modelo Relacional, Álgebra Relacional, Lenguaje SQL (DDL/DML) y Normalización (1FN a FNBC).' },
+    { id: 'asig-lab-cham', planEstudioId: 'plan-cham-171', departamentoRadicacionId: null, nombre: 'Laboratorio de Software I (Sede Chamical)', anoCursada: 1, regimenDictado: '1C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Herramientas de desarrollo, control de versiones Git, compilación y pruebas básicas de software.' },
+  ];
+  const usuarios = [
+    { id: 'u-admin', nombre: 'Administrador', apellido: 'General', dni: '20000001', email: 'admin@unlar.edu.ar', rol: 'ADMINISTRADOR', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-lucia', nombre: 'Lucía', apellido: 'Torres', dni: '28456123', email: 'titular.prog@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-martin', nombre: 'Martín', apellido: 'López', dni: '30112233', email: 'auxiliar.prog@unlar.edu.ar', rol: 'DOCENTE_AUXILIAR', carreraId: null, mustChangePassword: true, activo: true },
+    { id: 'u-sofia', nombre: 'Sofía', apellido: 'Romero', dni: '32998877', email: 'sofia.romero@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-diego', nombre: 'Diego', apellido: 'Castro', dni: '29334455', email: 'diego.castro@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-uap', nombre: 'Ana', apellido: 'Suárez', dni: '27554433', email: 'uap@unlar.edu.ar', rol: 'UAP', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-dir-isi', nombre: 'María', apellido: 'Vega', dni: '25111222', email: 'direccion.isi@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-isi', mustChangePassword: false, activo: true },
+    { id: 'u-dir-lsi', nombre: 'Gabriel', apellido: 'Ruiz', dni: '26333444', email: 'direccion.lsi@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-lsi', mustChangePassword: false, activo: true },
+    { id: 'u-dir-tui', nombre: 'Laura', apellido: 'Pérez', dni: '24888999', email: 'direccion.tui@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-tui', mustChangePassword: false, activo: true },
+    { id: 'u-consejo', nombre: 'Secretaría', apellido: 'Consejo DACEFyN', dni: '21000999', email: 'consejo.exactas@unlar.edu.ar', rol: 'CONSEJO_DEPARTAMENTAL', carreraId: null, mustChangePassword: false, activo: true },
+  ];
+  const equiposCatedra = [
+    { id: 'eq-1', asignaturaId: 'asig-prog1', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+    { id: 'eq-2', asignaturaId: 'asig-prog1', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
+    { id: 'eq-3', asignaturaId: 'asig-sis1', docenteId: 'u-sofia', cicloLectivo: 2026, cargo: 'Profesor Asociado', esResponsable: true },
+    { id: 'eq-4', asignaturaId: 'asig-sis1', docenteId: 'u-diego', cicloLectivo: 2026, cargo: 'Ayudante de Primera', esResponsable: false },
+    { id: 'eq-5', asignaturaId: 'asig-bd', docenteId: 'u-diego', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: true },
+    { id: 'eq-6', asignaturaId: 'asig-bd', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
+    { id: 'eq-7', asignaturaId: 'asig-der', docenteId: 'u-sofia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+  ];
+  const periodos = [
+    { id: 'per-2026-1c', cicloLectivo: 2026, tipoPeriodo: '1C', alcance: 'Anuales y 1.º Cuatrimestre', fechaLimite: '2026-04-30' },
+    { id: 'per-2026-2c', cicloLectivo: 2026, tipoPeriodo: '2C', alcance: '2.º Cuatrimestre', fechaLimite: '2026-08-31' },
+  ];
+  const docs: any[] = [
+    {
+      id: 'paac-1', type: 'PAAC', asignaturaId: 'asig-prog1', owner: 'u-lucia', cycle: 2026, periodo: '1C',
+      state: 'OBSERVADO', pedApproved: false, discApproved: false, expediente: '', resolucion: '',
+      data: {
+        intro: 'La asignatura introduce los fundamentos de la algoritmia y programación estructurada, esenciales para el desarrollo de software en Ingeniería en Sistemas.',
+        diag: 'Los ingresantes requieren nivelación en lógica proposicional. Se dispone del Laboratorio de Informática 2.',
+        concept: 'Comprender estructuras de control, tipos de datos y modularización.',
+        procedure: 'Diseñar, codificar y depurar algoritmos empleando buenas prácticas.',
+        attitude: 'Fomentar el trabajo en equipo y la responsabilidad ética profesional.',
+        competencias: [
+          ['Específica (CE-1)', 'Especificar, diseñar e implementar software de base y de aplicación.', '2', 'Construye programas modulares correctos a partir de especificaciones lógicas.'],
+          ['Genérica (CG-4)', 'Desempeñarse de manera efectiva en equipos de trabajo.', '1', 'Participa colaborativamente en la resolución de laboratorios grupales.'],
+        ],
+        method: 'Clases teórico-prácticas con resolución de problemas en máquina y seguimiento en aula virtual.',
+        resources: 'Proyector, entorno de desarrollo integrado (IDE), plataforma Moodle institucional.',
+        units: [['Unidad 1: Algoritmos y Estructuras Básicas', 'Concepto de algoritmo, variables, tipos de datos y estructuras secuenciales.'], ['Unidad 2: Estructuras de Control y Funciones', 'Condicionales, bucles repetitivos, pasaje de parámetros y modularidad.']],
+        tp: [['TP N° 1', 'Resolver problemas secuenciales', 'Unidad 1'], ['TP N° 2', 'Implementar ciclos y funciones modulares', 'Unidad 2']],
+        lab: 'Prácticas semanales de 2 hs en Laboratorio de Cómputos con asistencia obligatoria.',
+        eval: 'Dos exámenes parciales teórico-prácticos con sus respectivos recuperatorios.',
+        regular: '80% de asistencia a clases prácticas, 100% de TPs aprobados y parciales con nota >= 4.',
+        promotion: 'Parciales aprobados en primera instancia con nota >= 7 y coloquio integrador.',
+        free: 'Instancia práctica eliminatoria en laboratorio seguida de evaluación teórica oral y escrita.',
+        books: [['Básica', 'Joyanes Aguilar, L.', 'Fundamentos de Programación', 'McGraw-Hill', '2020'], ['Complementaria', 'Deitel, P. & Deitel, H.', 'Cómo programar en C/C++', 'Pearson', '2019']],
+        credit: [['Semanas 1 a 8', 'Unidad 1', '20', '15', '10', '2'], ['Semanas 9 a 15', 'Unidad 2', '18', '15', '8', '2']],
+      },
+      pedReport: { items: {}, dictamen: 'OBSERVADO', obsGenerales: 'Precisar la articulación horizontal en el diagnóstico.' },
+      discReport: { items: {}, dictamen: 'PENDIENTE', obsDisciplinares: '' },
+      comments: [
+        { id: 'obs-1', field: 'diag', campoPath: 'fundamentacionDiagnostico.diagnostico', section: 1, area: 'uap', author: 'Ana Suárez (UAP)', text: 'Explicitar cómo se coordina horizontalmente con Álgebra y Lógica del primer cuatrimestre.', date: '10/04/2026', resolved: false },
+      ],
+    },
+    {
+      id: 'paac-2', type: 'PAAC', asignaturaId: 'asig-sis1', owner: 'u-sofia', cycle: 2026, periodo: '1C',
+      state: 'ENVIADO_A_REVISION', pedApproved: false, discApproved: false, expediente: '', resolucion: '',
+      data: {
+        intro: 'Provee las bases metodológicas para el relevamiento, análisis y especificación de requerimientos de sistemas de información organizacionales.',
+        diag: 'Grupo de segundo año con conocimientos previos de programación básica.',
+        concept: 'Asimilar el ciclo de vida del software y la teoría general de sistemas.',
+        procedure: 'Modelar procesos de negocio e identificar requerimientos funcionales y no funcionales.',
+        attitude: 'Capacidad de escucha activa en entrevistas con usuarios y rigor documental.',
+        competencias: [['Específica (CE-2)', 'Relevar, analizar y especificar requerimientos de sistemas de información.', '3', 'Elabora documentos SRS completos y modelos de casos de uso validados.']],
+        method: 'Estudio de casos reales, simulación de entrevistas y taller de modelado UML.',
+        resources: 'Herramientas CASE, guías de estudio y bibliografía digital.',
+        units: [['Unidad 1: Teoría General de Sistemas', 'Sistemas abiertos, subsistemas organizacionales y procesos.'], ['Unidad 2: Ingeniería de Requerimientos', 'Técnicas de relevamiento, casos de uso y especificación SRS.']],
+        tp: [['TP Integrador Parte 1', 'Relevamiento de organización local', 'Unidad 1 y 2']],
+        lab: 'Uso de herramientas de modelado CASE en gabinete.',
+        eval: 'Evaluación continua de entregas incrementales del trabajo integrador y dos parciales.',
+        regular: 'Aprobar parciales con nota mínima de 4 y el 100% de entregas del TP integrador.',
+        promotion: 'Nota mínima 7 en ambos parciales y defensa pública del proyecto integrador.',
+        free: 'Presentación previa de un caso práctico completo y examen escrito/oral.',
+        books: [['Básica', 'Kendall, K. & Kendall, J.', 'Análisis y Diseño de Sistemas', 'Pearson', '2018']],
+        credit: [['Semanas 1 a 15', 'Unidad 1', '30', '25', '5', '2'], ['Semanas 16 a 30', 'Unidad 2', '28', '24', '4', '2']],
+      },
+      pedReport: { items: {}, dictamen: 'PENDIENTE', obsGenerales: '' },
+      discReport: { items: {}, dictamen: 'PENDIENTE', obsDisciplinares: '' },
+      comments: [],
+    },
+    {
+      id: 'paac-3', type: 'PAAC', asignaturaId: 'asig-bd', owner: 'u-diego', cycle: 2026, periodo: '2C',
+      state: 'APROBADO_PLENO', pedApproved: true, discApproved: true, expediente: '', resolucion: '',
+      data: {
+        intro: 'Diseño, implementación y administración de bases de datos relacionales.',
+        diag: 'Estudiantes con manejo fluido de estructuras de datos.',
+        concept: 'Dominar el modelo relacional, álgebra relacional y normalización.',
+        procedure: 'Construir esquemas normalizados y consultas complejas en SQL.',
+        attitude: 'Valorar la integridad, seguridad y confidencialidad de los datos.',
+        competencias: [],
+        method: 'Clases expositivas y práctica intensiva con motores PostgreSQL.',
+        resources: 'Servidor de base de datos de cátedra, guías SQL.',
+        units: [['Unidad 1: Modelo Entidad-Relación y Relacional', 'Modelado conceptual, claves y restricciones de integridad.'], ['Unidad 2: Lenguaje SQL y Normalización', 'DDL, DML, formas normales 1FN a BCNF y transacciones.']],
+        tp: [['TP 1: Modelado DER', 'Diseñar esquema relacional', 'Unidad 1'], ['TP 2: Consultas SQL', 'Implementar base en PostgreSQL', 'Unidad 2']],
+        lab: 'Ejecución de scripts SQL sobre contenedor PostgreSQL.',
+        eval: 'Dos evaluaciones prácticas en laboratorio y coloquio teórico.',
+        regular: 'Aprobar ambos parciales prácticos con nota >= 4.',
+        promotion: 'Aprobar parciales con nota >= 7 y coloquio final.',
+        free: 'Examen práctico en máquina de diseño y SQL, más instancia teórica.',
+        books: [['Básica', 'Elmasri, R. & Navathe, S.', 'Fundamentos de Sistemas de Bases de Datos', 'Pearson', '2017']],
+        credit: [['Semanas 1 a 15', 'Unidades 1 y 2', '25', '20', '13', '2']],
+      },
+      pedReport: { items: Object.fromEntries(PEDITEMS.map((_, i) => [i, 'Desarrollo pertinente y ajustado a la normativa.'])), dictamen: 'APROBADO', obsGenerales: 'Propuesta pedagógica sólida.', by: 'Ana Suárez' },
+      discReport: { items: Object.fromEntries(DISCITEMS.map((_, i) => [i, 'Cumple'])), dictamen: 'APROBADO', obsDisciplinares: 'Cumple con los contenidos mínimos.', by: 'Laura Pérez' },
+      comments: [],
+    },
+  ];
+
+  const docentesList = usuarios.filter((u) => u.rol.startsWith('DOCENTE'));
+  const paads = docentesList.map((u, idx) => ({
+    id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
+    state: idx === 0 ? 'ENVIADO_A_REVISION' : idx === 2 ? 'APROBADO' : 'BORRADOR',
+    pedApproved: idx === 2, discApproved: idx === 2,
+    data: {
+      material: 'Actualización de guías de trabajos prácticos, casos de estudio y material didáctico para el aula virtual.',
+      otherTeach: 'Atención de consultas semanales, participación en tribunales examinadores y reuniones de cátedra.',
+      research: 'Integrante del proyecto de investigación en Ingeniería de Software y Calidad de Sistemas (DACEFyN).',
+      human: 'Formación y acompañamiento de ayudantes alumnos y adscriptos de la cátedra.',
+      formation: 'Curso de posgrado en Metodologías Ágiles y Docencia Universitaria.',
+      extension: 'Dictado de taller de introducción a la programación abierto a escuelas secundarias.',
+      government: 'Participación en comisiones asesoras de carrera.',
+      scheduleTable: [
+        ['Docencia Directa (Frente a alumnos)', 'Cátedras asignadas del ciclo', '6', '180'],
+        ['Preparación de material y evaluación', 'DACEFyN', '2', '60'],
+        ['Investigación / Extensión', 'Instituto de Informática', '2', '60'],
+      ],
+    },
+    comments: [],
+  }));
+
+  return { cycle: 2026, sedes, departamentos, carreras, planes, asignaturas, usuarios, equiposCatedra, periodos, docs: [...docs, ...paads] };
+}

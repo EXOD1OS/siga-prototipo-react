@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tema Claro Original por Defecto (Blanco y Verde #157b79) */
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --sidebar: #ffffff;
+  --border: #e2e8ef;
+  --ink: #203349;
+  --muted: #667789;
+  --primary: #157b79;
+  --primary-hover: #116260;
+  --soft: #eaf5f2;
+  color-scheme: light;
+}
+
+/* Modo Oscuro (Activado desde el botón del Header) */
+html.dark {
+  --bg: #0c0f17;
+  --surface: #161b26;
+  --sidebar: #11151f;
+  --border: #262e40;
+  --ink: #f1f5f9;
+  --muted: #94a3b8;
+  --primary: #14b8a6;
+  --primary-hover: #0d9488;
+  --soft: rgba(20, 184, 166, 0.14);
+  color-scheme: dark;
+}
