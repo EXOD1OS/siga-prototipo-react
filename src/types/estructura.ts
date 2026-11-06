@@ -40,6 +40,8 @@ export interface Asignatura {
   planEstudioId: string;
   /** Departamento que dicta la materia. Si difiere del de la carrera, es matricial. */
   departamentoRadicacionId: string | null;
+  /** Código de la materia en el plan (ej. ISI-1.01). */
+  codigo: string;
   nombre: string;
   anoCursada: number;
   regimenDictado: Regimen;

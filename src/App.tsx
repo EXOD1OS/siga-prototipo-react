@@ -232,10 +232,13 @@ export default function App() {
             <PlanificacionesList
               paacs={paacs}
               role={role}
+              uid={uid}
               careerId={careerId}
+              cycle={S.cycle}
+              carreras={S.carreras}
+              equiposCatedra={S.equiposCatedra}
               asigContext={asigContext}
               fullName={fullName}
-              equipoDeAsig={equipoDeAsig}
               onOpenDoc={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
@@ -409,12 +412,16 @@ export default function App() {
               onEmitObserved={() =>
                 updateActiveDoc((doc) => {
                   doc.state = 'OBSERVADO';
+                  // Registra qué área observó, para la columna Dictámenes de la bandeja.
+                  const informe = role === 'UAP' ? 'pedReport' : 'discReport';
+                  doc[informe] = { ...doc[informe], dictamen: 'OBSERVADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
                   return doc;
                 })
               }
               onEmitApprovedUap={() =>
                 updateActiveDoc((doc) => {
                   doc.pedApproved = true;
+                  doc.pedReport = { ...doc.pedReport, dictamen: 'APROBADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
                   doc.state = doc.discApproved ? 'APROBADO_PLENO' : 'APROBADO_PEDAGOGICO';
                   return doc;
                 })
@@ -422,6 +429,7 @@ export default function App() {
               onEmitApprovedDir={() =>
                 updateActiveDoc((doc) => {
                   doc.discApproved = true;
+                  doc.discReport = { ...doc.discReport, dictamen: 'APROBADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
                   doc.state = doc.pedApproved ? 'APROBADO_PLENO' : 'APROBADO_DISCIPLINAR';
                   return doc;
                 })
