@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { createInitialData } from './data/mockData';
+import { createInitialData, reemplazarCatedrasDeUsuario, usuariosConCatedras } from './data/mockData';
 import { Header, type NotificationItem } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PaadModal } from './components/shared/PaadModal';
@@ -17,7 +17,6 @@ export default function App() {
   const [uid, setUid] = useState('u-lucia');
   const [careerId, setCareerId] = useState('car-isi');
   const [page, setPage] = useState('home');
-  const [selectedAsigId, setSelectedAsigId] = useState('asig-prog1');
   const [activeDocId, setActiveDocId] = useState('paac-1');
   const [modalPaadId, setModalPaadId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -177,7 +176,7 @@ export default function App() {
             setUid={setUid}
             careerId={careerId}
             setCareerId={setCareerId}
-            docentes={S.usuarios.filter((u) => u.rol.startsWith('DOCENTE'))}
+            docentes={S.usuarios.filter((u) => u.rol === 'Docente')}
             carreras={S.carreras}
             activeUserName={activeUserName}
             isDark={isDark}
@@ -473,49 +472,20 @@ export default function App() {
               asigContext={asigContext}
               equipoDeAsig={equipoDeAsig}
               fullName={fullName}
-              onAddMember={(asigId: string, docId: string, cargo: string, esResp: boolean) => {
-                if (
-                  S.equiposCatedra.some(
-                    (x) => x.asignaturaId === asigId && x.docenteId === docId && x.cicloLectivo === S.cycle
-                  )
-                ) {
-                  return showToast('El docente ya integra esta cátedra en el ciclo actual.');
-                }
+              onSaveEquipo={(asigId, integrantes) => {
+                // Reemplaza el equipo de la asignatura en el ciclo vigente; otros ciclos no se tocan.
                 setS((prev) => ({
                   ...prev,
                   equiposCatedra: [
-                    ...prev.equiposCatedra.map((x) =>
-                      esResp && x.asignaturaId === asigId ? { ...x, esResponsable: false } : x
+                    ...prev.equiposCatedra.filter(
+                      (x) => !(x.asignaturaId === asigId && x.cicloLectivo === prev.cycle)
                     ),
-                    {
-                      id: 'eq-' + Date.now(),
-                      asignaturaId: asigId,
-                      docenteId: docId,
-                      cicloLectivo: prev.cycle,
-                      cargo,
-                      esResponsable: esResp,
-                    },
+                    ...integrantes.map((i) => ({ ...i, asignaturaId: asigId, cicloLectivo: prev.cycle })),
                   ],
                 }));
-                showToast('Docente incorporado al equipo de cátedra.');
+                showToast('Equipo de cátedra actualizado.');
               }}
-              onMakeResponsable={(asigId: string, eqId: string) => {
-                setS((prev) => ({
-                  ...prev,
-                  equiposCatedra: prev.equiposCatedra.map((x) =>
-                    x.asignaturaId === asigId ? { ...x, esResponsable: x.id === eqId } : x
-                  ),
-                }));
-                showToast('Docente designado como Responsable de Cátedra.');
-              }}
-              onRemoveMember={(eqId: string) => {
-                setS((prev) => ({
-                  ...prev,
-                  equiposCatedra: prev.equiposCatedra.filter((x) => x.id !== eqId),
-                }));
-                showToast('Integrante removido de la cátedra.');
-              }}
-              onLotePeriodo={(perTipo: string) => {
+              onLotePeriodo={(perTipo) => {
                 const asigs = S.asignaturas.filter((a) =>
                   perTipo === '1C' ? ['1C', 'ANUAL'].includes(a.regimenDictado) : a.regimenDictado === '2C'
                 );
@@ -550,40 +520,64 @@ export default function App() {
                     : `Todas las asignaturas de ${perTipo} ya tienen su PAAC instanciado.`
                 );
               }}
-              onCreateAsig={(newAsig: any) => {
-                const newId = 'asig-' + Date.now();
-                setS((prev) => ({
-                  ...prev,
-                  asignaturas: [...prev.asignaturas, { id: newId, ...newAsig }],
-                }));
-                showToast('Asignatura creada e incorporada al árbol curricular.');
-              }}
-              onUpdateAsig={(asigId: string, updated: any) => {
-                setS((prev) => ({
-                  ...prev,
-                  asignaturas: prev.asignaturas.map((a) => (a.id === asigId ? { ...a, ...updated } : a)),
-                }));
-                showToast('Configuración de asignatura actualizada.');
-              }}
             />
           )}
 
           {page === 'admin-usuarios' && role === 'ADMINISTRADOR' && (
             <AdminUsuariosView
-              usuarios={S.usuarios}
+              usuarios={usuariosConCatedras(S)}
               carreras={S.carreras}
-              onCreateUser={(newUser: any) =>
+              departamentos={S.departamentos}
+              planes={S.planes}
+              asignaturas={S.asignaturas}
+              equiposCatedra={S.equiposCatedra}
+              cycle={S.cycle}
+              onCreateUser={({ catedras, ...datos }) => {
+                const id = 'u-' + Date.now();
                 setS((prev) => ({
                   ...prev,
-                  usuarios: [...prev.usuarios, { id: 'u-' + Date.now(), ...newUser, mustChangePassword: true, activo: true }],
-                }))
-              }
-              onResetDni={(uId: string) =>
+                  usuarios: [...prev.usuarios, { id, ...datos, mustChangePassword: true }],
+                  // El Director queda registrado como director de esa carrera.
+                  carreras:
+                    datos.rol === 'Director' && datos.carreraId
+                      ? prev.carreras.map((c) => (c.id === datos.carreraId ? { ...c, directorId: id } : c))
+                      : prev.carreras,
+                  // Las cátedras se persisten como registros de EQUIPOS_CATEDRA del ciclo vigente.
+                  equiposCatedra: reemplazarCatedrasDeUsuario(prev.equiposCatedra, id, prev.cycle, catedras),
+                }));
+                showToast(
+                  `Usuario creado${catedras.length ? ` con ${catedras.length} cátedra(s)` : ''}. Contraseña provisoria: DNI ${datos.dni}.`
+                );
+              }}
+              onUpdateUser={(uId, { catedras, ...datos }) => {
+                setS((prev) => ({
+                  ...prev,
+                  usuarios: prev.usuarios.map((u) => (u.id === uId ? { ...u, ...datos } : u)),
+                  // El Director queda registrado como director de esa carrera.
+                  carreras:
+                    datos.rol === 'Director' && datos.carreraId
+                      ? prev.carreras.map((c) => (c.id === datos.carreraId ? { ...c, directorId: uId } : c))
+                      : prev.carreras,
+                  // Si deja de ser Docente, `catedras` llega vacío y se lo desvincula de sus equipos.
+                  equiposCatedra: reemplazarCatedrasDeUsuario(prev.equiposCatedra, uId, prev.cycle, catedras),
+                }));
+                showToast('Datos y cátedras del usuario actualizados.');
+              }}
+              onDeleteUser={(uId) => {
+                setS((prev) => ({
+                  ...prev,
+                  usuarios: prev.usuarios.filter((u) => u.id !== uId),
+                  equiposCatedra: prev.equiposCatedra.filter((e) => e.docenteId !== uId),
+                }));
+                showToast('Usuario eliminado.');
+              }}
+              onResetDni={(uId) => {
                 setS((prev) => ({
                   ...prev,
                   usuarios: prev.usuarios.map((u) => (u.id === uId ? { ...u, mustChangePassword: true } : u)),
-                }))
-              }
+                }));
+                showToast('Clave blanqueada: el usuario deberá ingresar con su DNI.');
+              }}
             />
           )}
         </main>

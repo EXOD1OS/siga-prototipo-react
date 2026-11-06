@@ -1,3 +1,20 @@
+import type {
+  Asignatura,
+  Carrera,
+  CatedraAsignada,
+  Departamento,
+  EquipoCatedra,
+  PeriodoAcademico,
+  PlanEstudio,
+  Sede,
+  Usuario,
+  UsuarioConCatedras,
+} from '../types/estructura';
+
+/**
+ * Perfiles del selector "Vista de Rol" (simulación de sesión del prototipo).
+ * Para el rol de cuenta de un usuario usar el tipo Rol de types/estructura.
+ */
 export const ROLES: Record<string, string> = {
   ADMINISTRADOR: 'Administrador',
   DOCENTE_RESPONSABLE: 'Docente Responsable',
@@ -143,48 +160,118 @@ export const DISCITEMS = [
   '4. Control individual de PAAD de los integrantes de la cátedra',
 ];
 
+/** Datos necesarios para resolver las cátedras de los usuarios. */
+export interface DatosCatedras {
+  cycle: number;
+  usuarios: Usuario[];
+  equiposCatedra: EquipoCatedra[];
+  asignaturas: Asignatura[];
+  planes: PlanEstudio[];
+  carreras: Carrera[];
+}
+
+/**
+ * Cada usuario con su arreglo `catedras` del ciclo vigente (asignatura, carrera, cargo).
+ * Se deriva de EQUIPOS_CATEDRA, que sigue siendo la única fuente de verdad:
+ * así lo editado desde Estructura Académica y desde Usuarios queda siempre sincronizado.
+ */
+export function usuariosConCatedras(data: DatosCatedras): UsuarioConCatedras[] {
+  const asigBy = new Map(data.asignaturas.map((a) => [a.id, a]));
+  const planBy = new Map(data.planes.map((p) => [p.id, p]));
+  const carBy = new Map(data.carreras.map((c) => [c.id, c]));
+  const porDocente = new Map<string, CatedraAsignada[]>();
+  for (const e of data.equiposCatedra) {
+    if (e.cicloLectivo !== data.cycle) continue;
+    const asig = asigBy.get(e.asignaturaId);
+    const car = asig ? carBy.get(planBy.get(asig.planEstudioId)?.carreraId ?? '') : undefined;
+    const lista = porDocente.get(e.docenteId) ?? [];
+    lista.push({
+      asignaturaId: e.asignaturaId,
+      asignaturaNombre: asig?.nombre ?? e.asignaturaId,
+      carreraId: car?.id ?? '',
+      carreraCodigo: car?.codigo ?? '?',
+      cargo: e.cargo,
+      esResponsable: e.esResponsable,
+    });
+    porDocente.set(e.docenteId, lista);
+  }
+  return data.usuarios.map((u) => ({ ...u, catedras: u.rol === 'Docente' ? (porDocente.get(u.id) ?? []) : [] }));
+}
+
+/**
+ * Reemplaza las cátedras de un docente en un ciclo. Conserva el id del registro
+ * si la asignatura ya estaba, y mantiene un único Responsable por cátedra.
+ */
+export function reemplazarCatedrasDeUsuario(
+  equipos: EquipoCatedra[],
+  docenteId: string,
+  ciclo: number,
+  catedras: CatedraAsignada[]
+): EquipoCatedra[] {
+  const previos = new Map(
+    equipos.filter((e) => e.docenteId === docenteId && e.cicloLectivo === ciclo).map((e) => [e.asignaturaId, e])
+  );
+  const nuevaResponsabilidad = new Set(catedras.filter((c) => c.esResponsable).map((c) => c.asignaturaId));
+  const resto = equipos
+    .filter((e) => !(e.docenteId === docenteId && e.cicloLectivo === ciclo))
+    .map((e) =>
+      e.cicloLectivo === ciclo && e.esResponsable && nuevaResponsabilidad.has(e.asignaturaId)
+        ? { ...e, esResponsable: false }
+        : e
+    );
+  const propios: EquipoCatedra[] = catedras.map((c, i) => ({
+    id: previos.get(c.asignaturaId)?.id ?? `eq-${Date.now()}-${i}`,
+    asignaturaId: c.asignaturaId,
+    docenteId,
+    cicloLectivo: ciclo,
+    cargo: c.cargo,
+    esResponsable: c.esResponsable,
+  }));
+  return [...resto, ...propios];
+}
+
 export function createInitialData() {
-  const sedes = [
+  const sedes: Sede[] = [
     { id: 'sede-cap', nombre: 'Sede Capital', esCapital: true },
     { id: 'sede-cham', nombre: 'Sede Regional Chamical', esCapital: false },
   ];
-  const departamentos = [
+  const departamentos: Departamento[] = [
     { id: 'depto-exactas', nombre: 'DACEFyN (Ciencias Exactas, Físicas y Naturales)', sedeId: 'sede-cap' },
     { id: 'depto-humanas', nombre: 'Departamento de Ciencias Humanas y de la Educación', sedeId: 'sede-cap' },
     { id: 'depto-sociales', nombre: 'Departamento de Ciencias Sociales, Jurídicas y Económicas', sedeId: 'sede-cap' },
   ];
-  const carreras = [
+  const carreras: Carrera[] = [
     { id: 'car-isi', codigo: 'ISI', nombre: 'Ingeniería en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-isi' },
     { id: 'car-lsi', codigo: 'LSI', nombre: 'Licenciatura en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-lsi' },
     { id: 'car-tui', codigo: 'TUI', nombre: 'Tecnicatura Universitaria en Informática', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-tui' },
     { id: 'car-tui-cham', codigo: 'TUI-CHAM', nombre: 'Tecnicatura Universitaria en Informática (Chamical)', sedeId: 'sede-cham', departamentoId: null, directorId: 'u-dir-tui' },
   ];
-  const planes = [
+  const planes: PlanEstudio[] = [
     { id: 'plan-isi-448', carreraId: 'car-isi', ordenanza: 'Ord. HCS N° 448/2011', enfoque: 'COMPETENCIAS', activo: true },
     { id: 'plan-lsi-171', carreraId: 'car-lsi', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
     { id: 'plan-tui-171', carreraId: 'car-tui', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
     { id: 'plan-cham-171', carreraId: 'car-tui-cham', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
   ];
-  const asignaturas = [
+  const asignaturas: Asignatura[] = [
     { id: 'asig-prog1', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
     { id: 'asig-sis1', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
     { id: 'asig-der', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-sociales', nombre: 'Derecho Informático y Ética Profesional', anoCursada: 5, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Legislación informática, propiedad intelectual del software, delitos informáticos, protección de datos personales y deontología profesional.' },
     { id: 'asig-bd', planEstudioId: 'plan-tui-171', departamentoRadicacionId: 'depto-exactas', nombre: 'Bases de Datos', anoCursada: 2, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Modelo Entidad-Relación, Modelo Relacional, Álgebra Relacional, Lenguaje SQL (DDL/DML) y Normalización (1FN a FNBC).' },
     { id: 'asig-lab-cham', planEstudioId: 'plan-cham-171', departamentoRadicacionId: null, nombre: 'Laboratorio de Software I (Sede Chamical)', anoCursada: 1, regimenDictado: '1C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Herramientas de desarrollo, control de versiones Git, compilación y pruebas básicas de software.' },
   ];
-  const usuarios = [
-    { id: 'u-admin', nombre: 'Administrador', apellido: 'General', dni: '20000001', email: 'admin@unlar.edu.ar', rol: 'ADMINISTRADOR', carreraId: null, mustChangePassword: false, activo: true },
-    { id: 'u-lucia', nombre: 'Lucía', apellido: 'Torres', dni: '28456123', email: 'titular.prog@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
-    { id: 'u-martin', nombre: 'Martín', apellido: 'López', dni: '30112233', email: 'auxiliar.prog@unlar.edu.ar', rol: 'DOCENTE_AUXILIAR', carreraId: null, mustChangePassword: true, activo: true },
-    { id: 'u-sofia', nombre: 'Sofía', apellido: 'Romero', dni: '32998877', email: 'sofia.romero@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
-    { id: 'u-diego', nombre: 'Diego', apellido: 'Castro', dni: '29334455', email: 'diego.castro@unlar.edu.ar', rol: 'DOCENTE_RESPONSABLE', carreraId: null, mustChangePassword: false, activo: true },
+  const usuarios: Usuario[] = [
+    { id: 'u-admin', nombre: 'Administrador', apellido: 'General', dni: '20000001', email: 'admin@unlar.edu.ar', rol: 'Administrador', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-lucia', nombre: 'Lucía', apellido: 'Torres', dni: '28456123', email: 'titular.prog@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-martin', nombre: 'Martín', apellido: 'López', dni: '30112233', email: 'auxiliar.prog@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: true, activo: true },
+    { id: 'u-sofia', nombre: 'Sofía', apellido: 'Romero', dni: '32998877', email: 'sofia.romero@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-diego', nombre: 'Diego', apellido: 'Castro', dni: '29334455', email: 'diego.castro@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-uap', nombre: 'Ana', apellido: 'Suárez', dni: '27554433', email: 'uap@unlar.edu.ar', rol: 'UAP', carreraId: null, mustChangePassword: false, activo: true },
-    { id: 'u-dir-isi', nombre: 'María', apellido: 'Vega', dni: '25111222', email: 'direccion.isi@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-isi', mustChangePassword: false, activo: true },
-    { id: 'u-dir-lsi', nombre: 'Gabriel', apellido: 'Ruiz', dni: '26333444', email: 'direccion.lsi@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-lsi', mustChangePassword: false, activo: true },
-    { id: 'u-dir-tui', nombre: 'Laura', apellido: 'Pérez', dni: '24888999', email: 'direccion.tui@unlar.edu.ar', rol: 'DIRECCION_CARRERA', carreraId: 'car-tui', mustChangePassword: false, activo: true },
-    { id: 'u-consejo', nombre: 'Secretaría', apellido: 'Consejo DACEFyN', dni: '21000999', email: 'consejo.exactas@unlar.edu.ar', rol: 'CONSEJO_DEPARTAMENTAL', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-dir-isi', nombre: 'María', apellido: 'Vega', dni: '25111222', email: 'direccion.isi@unlar.edu.ar', rol: 'Director', carreraId: 'car-isi', mustChangePassword: false, activo: true },
+    { id: 'u-dir-lsi', nombre: 'Gabriel', apellido: 'Ruiz', dni: '26333444', email: 'direccion.lsi@unlar.edu.ar', rol: 'Director', carreraId: 'car-lsi', mustChangePassword: false, activo: true },
+    { id: 'u-dir-tui', nombre: 'Laura', apellido: 'Pérez', dni: '24888999', email: 'direccion.tui@unlar.edu.ar', rol: 'Director', carreraId: 'car-tui', mustChangePassword: false, activo: true },
+    { id: 'u-consejo', nombre: 'Secretaría', apellido: 'Consejo DACEFyN', dni: '21000999', email: 'consejo.exactas@unlar.edu.ar', rol: 'Consejo', carreraId: null, mustChangePassword: false, activo: true },
   ];
-  const equiposCatedra = [
+  const equiposCatedra: EquipoCatedra[] = [
     { id: 'eq-1', asignaturaId: 'asig-prog1', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-2', asignaturaId: 'asig-prog1', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
     { id: 'eq-3', asignaturaId: 'asig-sis1', docenteId: 'u-sofia', cicloLectivo: 2026, cargo: 'Profesor Asociado', esResponsable: true },
@@ -193,7 +280,7 @@ export function createInitialData() {
     { id: 'eq-6', asignaturaId: 'asig-bd', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
     { id: 'eq-7', asignaturaId: 'asig-der', docenteId: 'u-sofia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
   ];
-  const periodos = [
+  const periodos: PeriodoAcademico[] = [
     { id: 'per-2026-1c', cicloLectivo: 2026, tipoPeriodo: '1C', alcance: 'Anuales y 1.º Cuatrimestre', fechaLimite: '2026-04-30' },
     { id: 'per-2026-2c', cicloLectivo: 2026, tipoPeriodo: '2C', alcance: '2.º Cuatrimestre', fechaLimite: '2026-08-31' },
   ];
@@ -283,7 +370,7 @@ export function createInitialData() {
     },
   ];
 
-  const docentesList = usuarios.filter((u) => u.rol.startsWith('DOCENTE'));
+  const docentesList = usuarios.filter((u) => u.rol === 'Docente');
   const paads = docentesList.map((u, idx) => ({
     id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
     state: idx === 0 ? 'ENVIADO_A_REVISION' : idx === 2 ? 'APROBADO' : 'BORRADOR',
