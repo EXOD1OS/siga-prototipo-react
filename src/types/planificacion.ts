@@ -51,9 +51,18 @@ export interface InformeEvaluacion {
   fecha?: string;
 }
 
+/** Observación anclada a un campo del documento por UAP o Dirección. */
 export interface ObservacionDoc {
   id: string;
   resolved: boolean;
+  field?: string;
+  campoPath?: string;
+  /** Índice del apartado del esquema donde está el campo. */
+  section?: number;
+  area?: 'uap' | 'direccion';
+  author?: string;
+  text?: string;
+  date?: string;
 }
 
 export type PaacData = Record<string, string | string[][] | undefined>;
@@ -75,11 +84,52 @@ export interface PaacDoc {
   pedReport: InformeEvaluacion;
   discReport: InformeEvaluacion;
   comments: ObservacionDoc[];
+  /** true si hubo cambios después del último "Guardar borrador". */
+  sinGuardar?: boolean;
+  /** Hora del último guardado de borrador. */
+  guardadoEn?: string;
+}
+
+/** Documento editable en DocumentFormView (PAAC o PAAD). */
+export interface DocumentoEditable {
+  id: string;
+  type: 'PAAC' | 'PAAD';
+  owner: string;
+  cycle: number;
+  state: string;
+  asignaturaId?: string;
+  data: PaacData;
+  comments: ObservacionDoc[];
+  sinGuardar?: boolean;
+  guardadoEn?: string;
 }
 
 export function esHistorica(d: Pick<PaacDoc, 'state'>): boolean {
   return ESTADOS_HISTORICOS.includes(d.state);
 }
+
+/** Un PAAC está iniciado si tiene algún campo cargado o ya salió de Borrador. */
+export function paacIniciado(d: Pick<PaacDoc, 'state' | 'data'>): boolean {
+  if (d.state !== 'BORRADOR') return true;
+  return Object.values(d.data ?? {}).some((v) => (Array.isArray(v) ? v.length > 0 : !!v && v.trim() !== ''));
+}
+
+/** Etapa de elaboración del documento PAAC (para la columna PAAC de la bandeja). */
+export type EtapaPaac = 'SIN_INICIAR' | 'EN_ELABORACION' | 'EN_CORRECCION' | 'PRESENTADO';
+
+export function etapaPaac(d: Pick<PaacDoc, 'state' | 'data'>): EtapaPaac {
+  if (!paacIniciado(d)) return 'SIN_INICIAR';
+  if (d.state === 'BORRADOR') return 'EN_ELABORACION';
+  if (d.state === 'OBSERVADO') return 'EN_CORRECCION';
+  return 'PRESENTADO';
+}
+
+export const ETAPA_PAAC: Record<EtapaPaac, { label: string; cls: string }> = {
+  SIN_INICIAR: { label: 'Sin iniciar', cls: 'text-muted' },
+  EN_ELABORACION: { label: 'En elaboración', cls: 'text-amber-700 dark:text-amber-400' },
+  EN_CORRECCION: { label: 'En corrección', cls: 'text-red-700 dark:text-red-400' },
+  PRESENTADO: { label: 'Presentado', cls: 'text-emerald-700 dark:text-emerald-400' },
+};
 
 /** Dictamen visible de un área: favorable si está aprobado, con observaciones si fue observado. */
 export function dictamenDe(aprobado: boolean, informe: InformeEvaluacion | undefined): Dictamen {

@@ -9,8 +9,10 @@ import {
   ESTADO_LABELS,
   ESTADOS_ACTIVOS,
   ESTADOS_HISTORICOS,
+  ETAPA_PAAC,
   dictamenDe,
   esHistorica,
+  etapaPaac,
   type Dictamen,
   type EstadoPlanif,
   type PaacDoc,
@@ -27,6 +29,9 @@ interface PlanificacionesListProps {
   equiposCatedra: EquipoCatedra[];
   asigContext: (id: string) => AsigContext;
   fullName: (id: string) => string;
+  /** Si la sesión puede editar el PAAC (misma regla que el editor). */
+  puedeEditar: (d: PaacDoc) => boolean;
+  /** Abre el editor / visor del PAAC. */
   onOpenDoc: (id: string) => void;
   onOpenReport: (id: string) => void;
   onElevarPaac: (id: string) => void;
@@ -52,6 +57,59 @@ function DictamenChip({ area, value }: { area: string; value: Dictamen }) {
   );
 }
 
+function DocIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-3.5 w-3.5 shrink-0">
+      <path d="M5 2.5h6.5L15 6v11.5H5z" strokeLinejoin="round" />
+      <path d="M11.5 2.5V6H15M7.5 10h5M7.5 13h5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Columna PAAC: acceso al editor/visor según etapa del documento y permisos de la sesión. */
+function PaacCelda({
+  doc,
+  editable,
+  asignatura,
+  onOpen,
+}: {
+  doc: PaacDoc;
+  editable: boolean;
+  asignatura: string;
+  onOpen: () => void;
+}) {
+  const etapa = etapaPaac(doc);
+  const { label, cls } = ETAPA_PAAC[etapa];
+  const btnBase =
+    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary';
+
+  if (etapa === 'SIN_INICIAR') {
+    return editable ? (
+      <button type="button" onClick={onOpen} aria-label={`Iniciar PAAC de ${asignatura}`} className={`${btnBase} bg-primary text-white hover:bg-primary-hover`}>
+        <span aria-hidden>+</span> Iniciar PAAC
+      </button>
+    ) : (
+      <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-[11px] font-medium text-muted">
+        <DocIcon /> Pendiente
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${editable ? 'Editar' : 'Ver'} PAAC de ${asignatura}`}
+        className={`${btnBase} border border-border bg-surface text-primary hover:border-primary hover:bg-soft`}
+      >
+        <DocIcon /> {editable ? 'Editar PAAC' : 'Ver PAAC'}
+      </button>
+      <span className={`text-[10px] font-semibold ${cls}`}>{label}</span>
+    </div>
+  );
+}
+
 const DESCRIPCION_ALCANCE: Record<string, string> = {
   DIRECCION_CARRERA: 'Planificaciones de tu carrera, en proceso e históricas.',
   UAP: 'Todas las carreras y departamentos (unidad transversal).',
@@ -69,6 +127,7 @@ export function PlanificacionesList({
   equiposCatedra,
   asigContext,
   fullName,
+  puedeEditar,
   onOpenDoc,
   onOpenReport,
   onElevarPaac,
@@ -166,7 +225,6 @@ export function PlanificacionesList({
       fn(d.id);
     };
     return {
-      onAbrirPaac: cerrarY(onOpenDoc),
       onEvaluar: puedeEvaluar ? cerrarY(onOpenReport) : null,
       onElevar: esDireccion && d.state === 'APROBADO_PLENO' ? cerrarY(onElevarPaac) : null,
       onFormalizar:
@@ -246,8 +304,8 @@ export function PlanificacionesList({
             >
               {!carreraFija && <option value={TODOS}>Todas</option>}
               {(carreraFija ? carreras.filter((c) => c.id === carreraFija) : carrerasOpciones).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.codigo} — {c.nombre}
+                <option key={c.id} value={c.id} title={c.nombre}>
+                  {c.sigla}
                 </option>
               ))}
             </select>
@@ -272,7 +330,7 @@ export function PlanificacionesList({
           </div>
           <div>
             <label htmlFor="pl-estado" className={labelCls}>
-              Estado en el circuito
+              Estado
             </label>
             <select
               id="pl-estado"
@@ -300,14 +358,15 @@ export function PlanificacionesList({
 
         {/* Tabla */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] border-collapse text-xs">
+          <table className="w-full min-w-[1080px] border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border">
                 <th scope="col" className={`${thCls} pl-4 sm:pl-5`}>Asignatura</th>
                 <th scope="col" className={thCls}>Carrera</th>
                 <th scope="col" className={thCls}>Ciclo</th>
                 <th scope="col" className={thCls}>Responsable</th>
-                <th scope="col" className={thCls}>Estado en el circuito</th>
+                <th scope="col" className={thCls}>PAAC</th>
+                <th scope="col" className={thCls}>Estado</th>
                 <th scope="col" className={thCls}>Dictámenes</th>
                 <th scope="col" className={thCls}>Expediente</th>
                 <th scope="col" className={`${thCls} pr-4 text-right sm:pr-5`}>Informes</th>
@@ -319,25 +378,31 @@ export function PlanificacionesList({
                 const obs = d.comments.filter((c) => !c.resolved).length;
                 return (
                   <tr key={d.id} className="transition-colors hover:bg-background">
-                    <td className="px-3 py-3 pl-4 sm:pl-5 max-w-[260px]">
-                      <button
-                        type="button"
-                        onClick={() => onOpenDoc(d.id)}
-                        className="block max-w-full text-left font-semibold text-ink hover:text-primary truncate rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                        title={`Abrir PAAC de ${ctx.asig?.nombre}`}
-                      >
+                    <td className="px-3 py-3 pl-4 sm:pl-5 max-w-[240px]">
+                      <span className="block truncate font-semibold text-ink" title={ctx.asig?.nombre}>
                         {ctx.asig?.nombre ?? d.asignaturaId}
-                      </button>
+                      </span>
                       <span className="block text-[11px] font-mono text-muted">{ctx.asig?.codigo}</span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="font-semibold text-ink">{ctx.carrera?.codigo}</span>
-                      <span className="block text-[11px] text-muted truncate max-w-[160px]" title={ctx.carrera?.nombre}>
-                        {ctx.carrera?.nombre}
+                      <span
+                        title={ctx.carrera?.nombre}
+                        className="inline-block cursor-help rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink"
+                      >
+                        {ctx.carrera?.sigla ?? '—'}
                       </span>
+                      <span className="sr-only"> ({ctx.carrera?.nombre})</span>
                     </td>
                     <td className="px-3 py-3 tabular-nums text-ink">{d.cycle}</td>
                     <td className="px-3 py-3 text-ink">{fullName(d.owner)}</td>
+                    <td className="px-3 py-3">
+                      <PaacCelda
+                        doc={d}
+                        editable={puedeEditar(d)}
+                        asignatura={ctx.asig?.nombre ?? ''}
+                        onOpen={() => onOpenDoc(d.id)}
+                      />
+                    </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge state={d.state} />
@@ -380,7 +445,7 @@ export function PlanificacionesList({
               })}
               {filtradas.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
+                  <td colSpan={9} className="px-5 py-12 text-center">
                     <p className="text-sm font-medium text-ink">No hay planificaciones para mostrar</p>
                     <p className="mt-1 text-xs text-muted">
                       {hayFiltros
@@ -432,9 +497,6 @@ export function PlanificacionesList({
           doc={docInformes}
           ctx={asigContext(docInformes.asignaturaId)}
           responsable={fullName(docInformes.owner)}
-          equipo={equiposCatedra
-            .filter((e) => e.asignaturaId === docInformes.asignaturaId && e.cicloLectivo === docInformes.cycle)
-            .map((e) => ({ nombre: fullName(e.docenteId), cargo: e.cargo, esResponsable: e.esResponsable }))}
           acciones={accionesPara(docInformes)}
           onClose={() => setInformesId(null)}
         />

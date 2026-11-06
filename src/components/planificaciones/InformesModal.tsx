@@ -12,15 +12,8 @@ import {
   type PaacDoc,
 } from '../../types/planificacion';
 
-export interface IntegranteResumen {
-  nombre: string;
-  cargo: string;
-  esResponsable: boolean;
-}
-
 /** Acciones del circuito disponibles para la sesión actual (null = no corresponde). */
 export interface AccionesInforme {
-  onAbrirPaac: () => void;
   onEvaluar: (() => void) | null;
   onElevar: (() => void) | null;
   onFormalizar: (() => void) | null;
@@ -30,12 +23,11 @@ interface InformesModalProps {
   doc: PaacDoc;
   ctx: AsigContext;
   responsable: string;
-  equipo: IntegranteResumen[];
   acciones: AccionesInforme;
   onClose: () => void;
 }
 
-type Tab = 'paac' | 'disc' | 'ped';
+type Tab = 'disc' | 'ped';
 
 function DictamenBadge({ value }: { value: Dictamen }) {
   return (
@@ -51,16 +43,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted">{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Row({ label, value }: { label: string; value?: ReactNode }) {
-  const vacio = value === undefined || value === null || value === '';
-  return (
-    <div className="grid grid-cols-1 gap-0.5 py-2 sm:grid-cols-[170px_minmax(0,1fr)] sm:gap-3">
-      <dt className="text-[11px] font-medium text-muted">{label}</dt>
-      <dd className={`text-xs leading-relaxed ${vacio ? 'text-muted italic' : 'text-ink'}`}>{vacio ? 'Sin completar' : value}</dd>
-    </div>
   );
 }
 
@@ -83,15 +65,17 @@ function InformeArea({
   observaciones,
   titulo,
   quien,
+  tituloObs,
 }: {
-  informe: InformeEvaluacion;
+  informe: InformeEvaluacion | undefined;
   dictamen: Dictamen;
   items: string[];
   observaciones?: string;
   titulo: string;
   quien: string;
+  tituloObs: string;
 }) {
-  if (dictamen === 'PENDIENTE') return <Pendiente quien={quien} />;
+  if (!informe || dictamen === 'PENDIENTE') return <Pendiente quien={quien} />;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
@@ -104,82 +88,93 @@ function InformeArea({
         </div>
         <DictamenBadge value={dictamen} />
       </div>
-      <Section title="Valoración por ítem">
-        <dl className="divide-y divide-border rounded-lg border border-border px-3">
-          {items.map((item, i) => (
-            <Row key={item} label={item} value={informe.items[i]} />
-          ))}
-        </dl>
-      </Section>
-      <Section title="Observaciones / resolución">
-        <p className={`rounded-lg border border-border bg-background px-3 py-2.5 text-xs leading-relaxed ${observaciones ? 'text-ink' : 'text-muted italic'}`}>
+
+      <Section title={tituloObs}>
+        <p
+          className={`rounded-lg border border-border bg-background px-3 py-2.5 text-xs leading-relaxed ${
+            observaciones ? 'text-ink' : 'text-muted italic'
+          }`}
+        >
           {observaciones || 'Sin observaciones.'}
         </p>
+      </Section>
+
+      <Section title="Valoración por ítem">
+        <dl className="divide-y divide-border rounded-lg border border-border px-3">
+          {items.map((item, i) => {
+            const v = informe.items[i];
+            return (
+              <div key={item} className="grid grid-cols-1 gap-0.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-3">
+                <dt className="text-[11px] font-medium text-muted">{item}</dt>
+                <dd className={`text-xs leading-relaxed ${v ? 'text-ink' : 'text-muted italic'}`}>{v || 'Sin valorar'}</dd>
+              </div>
+            );
+          })}
+        </dl>
       </Section>
     </div>
   );
 }
 
-const texto = (v: unknown) => (typeof v === 'string' ? v : undefined);
-const filas = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-
-/** Visor de informes de una planificación: PAAC, Informe Disciplinar e Informe Pedagógico. */
-export function InformesModal({ doc, ctx, responsable, equipo, acciones, onClose }: InformesModalProps) {
-  const [tab, setTab] = useState<Tab>('paac');
-  const uid = useId();
+/**
+ * Visor de dictámenes de una planificación: Informe Disciplinar (Dirección de Carrera)
+ * e Informe Pedagógico (UAP). El PAAC se abre desde su propia columna en la bandeja.
+ */
+export function InformesModal({ doc, ctx, responsable, acciones, onClose }: InformesModalProps) {
   const disc = dictamenDe(doc.discApproved, doc.discReport);
   const ped = dictamenDe(doc.pedApproved, doc.pedReport);
-  const d = doc.data ?? {};
+  const [tab, setTab] = useState<Tab>('disc');
+  const uid = useId();
 
-  const tabs: { key: Tab; label: string; badge?: Dictamen }[] = [
-    { key: 'paac', label: 'PAAC' },
+  const tabs: { key: Tab; label: string; badge: Dictamen }[] = [
     { key: 'disc', label: 'Informe Disciplinar', badge: disc },
     { key: 'ped', label: 'Informe Pedagógico', badge: ped },
   ];
 
   const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    const i = tabs.findIndex((t) => t.key === tab);
-    const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length].key;
+    const next: Tab = tab === 'disc' ? 'ped' : 'disc';
     setTab(next);
     document.getElementById(`${uid}-tab-${next}`)?.focus();
   };
+
+  const hayAcciones = !!(acciones.onEvaluar || acciones.onElevar || acciones.onFormalizar);
 
   return (
     <Modal
       open
       onClose={onClose}
-      title={`Informes · ${ctx.asig?.nombre ?? doc.asignaturaId}`}
-      widthClass="max-w-3xl"
+      title={`Informes de evaluación · ${ctx.asig?.nombre ?? doc.asignaturaId}`}
+      widthClass="max-w-2xl"
       headerExtra={
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
           <StatusBadge state={doc.state} />
           <span>
-            {ctx.asig?.codigo} · {ctx.carrera?.codigo} · Ciclo {doc.cycle}
+            {ctx.asig?.codigo} · {ctx.carrera?.sigla} · Ciclo {doc.cycle} · Responsable: {responsable}
           </span>
-          {doc.expediente && <span className="font-mono text-primary font-semibold">{doc.expediente}</span>}
         </div>
       }
       footer={
         <>
-          <span className="mr-auto flex flex-wrap gap-2">
-            {acciones.onEvaluar && (
-              <ModalButton variant="primary" onClick={acciones.onEvaluar}>
-                Emitir / editar informe
-              </ModalButton>
-            )}
-            {acciones.onElevar && (
-              <ModalButton variant="primary" onClick={acciones.onElevar}>
-                Elevar al Consejo
-              </ModalButton>
-            )}
-            {acciones.onFormalizar && (
-              <ModalButton variant="primary" onClick={acciones.onFormalizar}>
-                Formalizar expediente
-              </ModalButton>
-            )}
-          </span>
-          <ModalButton onClick={acciones.onAbrirPaac}>Abrir PAAC completo</ModalButton>
+          {hayAcciones && (
+            <span className="mr-auto flex flex-wrap gap-2">
+              {acciones.onEvaluar && (
+                <ModalButton variant="primary" onClick={acciones.onEvaluar}>
+                  Emitir / editar informe
+                </ModalButton>
+              )}
+              {acciones.onElevar && (
+                <ModalButton variant="primary" onClick={acciones.onElevar}>
+                  Elevar al Consejo
+                </ModalButton>
+              )}
+              {acciones.onFormalizar && (
+                <ModalButton variant="primary" onClick={acciones.onFormalizar}>
+                  Formalizar expediente
+                </ModalButton>
+              )}
+            </span>
+          )}
           <ModalButton onClick={onClose}>Cerrar</ModalButton>
         </>
       }
@@ -203,117 +198,31 @@ export function InformesModal({ doc, ctx, responsable, equipo, acciones, onClose
               }`}
             >
               {t.label}
-              {t.badge && (
-                <span
-                  aria-label={DICTAMEN_LABELS[t.badge]}
-                  className={`h-2 w-2 rounded-full ${
-                    t.badge === 'FAVORABLE' ? 'bg-emerald-500' : t.badge === 'CON_OBSERVACIONES' ? 'bg-red-500' : 'bg-slate-400'
-                  }`}
-                />
-              )}
+              <DictamenBadge value={t.badge} />
             </button>
           );
         })}
       </div>
 
       <div id={`${uid}-panel-${tab}`} role="tabpanel" aria-labelledby={`${uid}-tab-${tab}`} className="max-h-[60vh] overflow-y-auto pr-1">
-        {tab === 'paac' && (
-          <div className="space-y-5">
-            <Section title="Aspectos generales">
-              <dl className="divide-y divide-border rounded-lg border border-border px-3">
-                <Row label="Asignatura" value={`${ctx.asig?.nombre ?? ''} (${ctx.asig?.codigo ?? '—'})`} />
-                <Row label="Carrera" value={ctx.carrera ? `${ctx.carrera.nombre} (${ctx.carrera.codigo})` : undefined} />
-                <Row label="Plan de estudio" value={ctx.plan ? `${ctx.plan.ordenanza} · ${ctx.plan.enfoque}` : undefined} />
-                <Row
-                  label="Curso / Régimen"
-                  value={ctx.asig ? `${ctx.asig.anoCursada}.º año · ${ctx.asig.regimenDictado} · ${ctx.asig.horasTotales} hs` : undefined}
-                />
-                <Row label="Docente responsable" value={responsable} />
-              </dl>
-            </Section>
-
-            <Section title={`Equipo de cátedra · ciclo ${doc.cycle}`}>
-              {equipo.length ? (
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                  {equipo.map((m) => (
-                    <li key={m.nombre} className="flex items-center gap-2 px-3 py-1.5 text-xs">
-                      <span className="flex-1 text-ink">{m.nombre}</span>
-                      <span className="text-muted">{m.cargo}</span>
-                      {m.esResponsable && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-                          Responsable
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted">Sin integrantes registrados para ese ciclo.</p>
-              )}
-            </Section>
-
-            <Section title="Fundamentación y objetivos">
-              <dl className="divide-y divide-border rounded-lg border border-border px-3">
-                <Row label="Fundamentación" value={texto(d.intro)} />
-                <Row label="Diagnóstico" value={texto(d.diag)} />
-                <Row label="Obj. conceptuales" value={texto(d.concept)} />
-                <Row label="Obj. procedimentales" value={texto(d.procedure)} />
-                <Row label="Obj. actitudinales" value={texto(d.attitude)} />
-              </dl>
-            </Section>
-
-            <Section title="Metodología y evaluación">
-              <dl className="divide-y divide-border rounded-lg border border-border px-3">
-                <Row label="Metodología" value={texto(d.method)} />
-                <Row label="Evaluación" value={texto(d.eval)} />
-                <Row label="Regularidad" value={texto(d.regular)} />
-                <Row label="Promoción" value={texto(d.promotion)} />
-                <Row label="Libre" value={texto(d.free)} />
-              </dl>
-            </Section>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ['Unidades', filas(d.units)],
-                ['Trabajos prácticos', filas(d.tp)],
-                ['Bibliografía', filas(d.books)],
-              ].map(([k, v]) => (
-                <div key={k} className="rounded-lg border border-border bg-background px-3 py-2 text-center">
-                  <div className="text-lg font-bold text-ink tabular-nums">{v}</div>
-                  <div className="text-[10px] text-muted">{k}</div>
-                </div>
-              ))}
-            </div>
-
-            {(doc.expediente || doc.resolucion) && (
-              <Section title="Resolución del Consejo">
-                <dl className="divide-y divide-border rounded-lg border border-border px-3">
-                  <Row label="Expediente" value={doc.expediente} />
-                  <Row label="Resolución" value={doc.resolucion || 'En trámite'} />
-                </dl>
-              </Section>
-            )}
-          </div>
-        )}
-
-        {tab === 'disc' && (
+        {tab === 'disc' ? (
           <InformeArea
             informe={doc.discReport}
             dictamen={disc}
             items={DISCITEMS}
             observaciones={doc.discReport?.obsDisciplinares}
             titulo="Informe Disciplinar · Dirección de Carrera (Anexo IV — Ord. 219/22)"
+            tituloObs="Observaciones y resolución de la Dirección"
             quien="la Dirección de Carrera"
           />
-        )}
-
-        {tab === 'ped' && (
+        ) : (
           <InformeArea
             informe={doc.pedReport}
             dictamen={ped}
             items={PEDITEMS}
             observaciones={doc.pedReport?.obsGenerales}
             titulo="Informe Pedagógico · UAP (Anexo III — Ord. 219/22)"
+            tituloObs="Sugerencias y observaciones de la UAP"
             quien="la UAP"
           />
         )}

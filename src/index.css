@@ -29,3 +29,37 @@ html.dark {
   --soft: rgba(20, 184, 166, 0.14);
   color-scheme: dark;
 }
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+/* Cambio de tema suave: la clase se aplica solo durante el cambio para no afectar otras transiciones. */
+html.theme-transition,
+html.theme-transition *:not([data-theme-anim]),
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 350ms ease,
+    border-color 350ms ease,
+    color 350ms ease,
+    fill 350ms ease,
+    stroke 350ms ease !important;
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition * {
+    transition: none !important;
+  }
+}

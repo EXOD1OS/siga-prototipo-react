@@ -41,9 +41,6 @@ export function ObservationFieldWrapper({
       <div className={`${showRail ? 'xl:col-span-8' : 'xl:col-span-12'} space-y-2`}>
         <label className={`block text-xs font-semibold ${hasUnresolved ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>
           {label}
-          <span className="block text-[10px] font-mono text-muted font-normal mt-0.5">
-            campoPath: {campoPath}
-          </span>
         </label>
         <div className={hasUnresolved ? 'ring-2 ring-amber-500/70 rounded-lg bg-amber-500/5 p-0.5' : ''}>
           {children}

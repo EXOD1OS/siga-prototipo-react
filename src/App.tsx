@@ -3,6 +3,7 @@ import { createInitialData, reemplazarCatedrasDeUsuario, usuariosConCatedras } f
 import { Header, type NotificationItem } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PaadModal } from './components/shared/PaadModal';
+import { Toast, type ToastTone } from './components/shared/Toast';
 import { PlanificacionesList } from './components/views/PlanificacionesList';
 import { PaadsListView } from './components/views/PaadsListView';
 import { DocumentFormView } from './components/views/DocumentFormView';
@@ -19,17 +20,21 @@ export default function App() {
   const [page, setPage] = useState('home');
   const [activeDocId, setActiveDocId] = useState('paac-1');
   const [modalPaadId, setModalPaadId] = useState<string | null>(null);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; msg: string; tone: ToastTone } | null>(null);
 
   const toggleTheme = () => {
     const next = !isDark;
+    const root = document.documentElement;
+    // Transición de colores solo durante el cambio de tema.
+    root.classList.add('theme-transition');
     setIsDark(next);
-    document.documentElement.classList.toggle('dark', next);
+    root.classList.toggle('dark', next);
+    window.setTimeout(() => root.classList.remove('theme-transition'), 400);
   };
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const showToast = (msg: string, tone: ToastTone = 'success') => {
+    // Un id nuevo reinicia el aviso aunque el mensaje se repita.
+    setToast({ id: Date.now(), msg, tone });
   };
 
   const userBy = (id: string) => S.usuarios.find((u) => u.id === id);
@@ -127,9 +132,8 @@ export default function App() {
     if (!d || !['BORRADOR', 'OBSERVADO'].includes(d.state)) return false;
     if (!role.startsWith('DOCENTE')) return false;
     if (d.type === 'PAAD') return d.owner === uid;
-    if (d.type === 'PAAC') {
-      return equipoDeAsig(d.asignaturaId).some((eq) => eq.docenteId === uid);
-    }
+    // El PAAC lo confecciona y edita el Docente Responsable; el resto del equipo lo ve en lectura.
+    if (d.type === 'PAAC') return responsableDeAsig(d.asignaturaId) === uid;
     return false;
   };
 
@@ -239,6 +243,7 @@ export default function App() {
               equiposCatedra={S.equiposCatedra}
               asigContext={asigContext}
               fullName={fullName}
+              puedeEditar={canEditDoc}
               onOpenDoc={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
@@ -325,37 +330,30 @@ export default function App() {
               fullName={fullName}
               S={S}
               onBack={() => setPage(currentDoc.type === 'PAAD' && !role.startsWith('DOCENTE') ? 'paads' : 'planificaciones')}
-              onUpdateField={(fKey: string, val: string) =>
+              onUpdateField={(fKey, val) =>
                 updateActiveDoc((doc) => {
+                  // Los cambios se reflejan en el estado al instante; el borrador marca que no se guardó.
                   doc.data[fKey] = val;
+                  doc.sinGuardar = true;
                   return doc;
                 })
               }
-              onUpdateTableCell={(fKey: string, r: number, c: number, val: string) =>
+              onSaveDraft={() => {
                 updateActiveDoc((doc) => {
-                  doc.data[fKey][r][c] = val;
+                  doc.sinGuardar = false;
+                  doc.guardadoEn = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
                   return doc;
-                })
-              }
-              onAddRow={(fKey: string, cols: number) =>
-                updateActiveDoc((doc) => {
-                  (doc.data[fKey] ??= []).push(Array(cols).fill(''));
-                  return doc;
-                })
-              }
-              onRemoveRow={(fKey: string, r: number) =>
-                updateActiveDoc((doc) => {
-                  doc.data[fKey].splice(r, 1);
-                  return doc;
-                })
-              }
-              onSaveDraft={() => showToast('Borrador guardado en JSONB.')}
+                });
+                showToast('Borrador guardado. El estado del documento no cambió.');
+              }}
               onSubmitDoc={() => {
                 updateActiveDoc((doc) => {
                   doc.state = 'ENVIADO_A_REVISION';
+                  doc.sinGuardar = false;
+                  doc.guardadoEn = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
                   return doc;
                 });
-                showToast('Documento enviado a revisión.');
+                showToast(`${currentDoc.type} presentado: enviado a revisión de UAP y Dirección.`);
               }}
               onAddObs={(fKey: string, path: string, txt: string, secIdx: number) =>
                 updateActiveDoc((doc) => {
@@ -603,12 +601,7 @@ export default function App() {
         />
       )}
 
-      {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-surface px-5 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
+      {toast && <Toast key={toast.id} message={toast.msg} tone={toast.tone} onDone={() => setToast(null)} />}
     </div>
   );
 }

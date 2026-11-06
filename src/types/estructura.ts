@@ -19,7 +19,10 @@ export interface Departamento {
 
 export interface Carrera {
   id: string;
+  /** Código único de la carrera (ej. TUI-CHAM). */
   codigo: string;
+  /** Sigla legible para listados (ej. ISI, LSI, TUI). */
+  sigla: string;
   nombre: string;
   sedeId: string;
   /** null en sedes regionales (sin departamento). */
