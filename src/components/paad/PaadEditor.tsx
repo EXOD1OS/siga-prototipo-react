@@ -91,8 +91,13 @@ export function PaadEditor({
       n: ap.subapartados.reduce((s, sub) => s + sub.listas.reduce((t, l) => t + contenido.listas[l.key].length, 0), 0),
       sec: ap.numero,
     })),
-    { id: 'horas', label: 'Distribución horaria', n: totalHoras(contenido), sec: SEC_HORAS },
+    { id: 'horas', label: '8) Distribución horaria', n: totalHoras(contenido), sec: SEC_HORAS },
   ];
+
+  // Progreso: apartados 1) a 8) con al menos un ítem (o, en el 8, al menos una hora cargada).
+  const apartados = indice.filter((it) => it.n !== null);
+  const completados = apartados.filter((it) => (it.n ?? 0) > 0).length;
+  const pct = Math.round((completados / apartados.length) * 100);
 
   const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -205,6 +210,30 @@ export function PaadEditor({
                   </button>
                 );
               })}
+
+              {/* Progreso de completitud */}
+              <div className="mt-2 border-t border-border px-2.5 pt-3">
+                <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[11px]">
+                  <span className="text-muted">Campos completados</span>
+                  <span className="tabular-nums">
+                    <strong className={pct === 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink'}>{pct}%</strong>
+                    <span className="ml-1 text-[10px] text-muted">
+                      {completados}/{apartados.length} apartados
+                    </span>
+                  </span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label="Progreso del PAAD"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct}
+                  aria-valuetext={`${completados} de ${apartados.length} apartados con contenido`}
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+                >
+                  <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out dark:bg-teal-500" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
             </nav>
 
             <div className="space-y-5 lg:col-span-9">
