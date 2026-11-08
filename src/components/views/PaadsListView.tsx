@@ -88,7 +88,7 @@ export function PaadsListView({
             <option value="ALL">Todas las Direcciones Evaluadoras</option>
             {carreras.map((c) => (
               <option key={c.id} value={c.id}>
-                Dirección {c.codigo}
+                Dirección {c.sigla}
               </option>
             ))}
           </select>
@@ -140,7 +140,7 @@ export function PaadsListView({
                           const c = asigContext(eq.asignaturaId);
                           return (
                             <div key={eq.id} className="text-[11px]">
-                              <span className="font-semibold text-primary">{c.carrera?.codigo}</span> · {c.asig?.nombre} ({eq.cargo})
+                              <span className="font-semibold text-primary">{c.carrera?.sigla}</span> · {c.asig?.nombre} ({eq.cargo})
                             </div>
                           );
                         })}
@@ -154,13 +154,13 @@ export function PaadsListView({
                           >
                             {carreras.map((c) => (
                               <option key={c.id} value={c.id}>
-                                Dirección {c.codigo}
+                                Dirección {c.sigla}
                               </option>
                             ))}
                           </select>
                         ) : (
                           <span className="px-2.5 py-1 rounded bg-soft text-primary font-semibold text-[11px]">
-                            Dirección {evalCar?.codigo}
+                            Dirección {evalCar?.sigla}
                           </span>
                         )}
                       </td>
@@ -185,7 +185,7 @@ export function PaadsListView({
                             onClick={() => onOpenPaadModal(d.id)}
                             className="px-2.5 py-1.5 rounded-lg bg-soft text-primary border border-primary/30 font-semibold"
                           >
-                            Vista Rápida (Modal)
+                            Vista previa (Anexo III)
                           </button>
                           <button
                             onClick={() => onOpenPaadDoc(d.id)}

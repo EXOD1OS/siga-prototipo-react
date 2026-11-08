@@ -10,6 +10,7 @@ import type {
   Usuario,
   UsuarioConCatedras,
 } from '../types/estructura';
+import { matrizVacia, paadVacio, type PaadContenido } from '../types/paad';
 
 /**
  * Perfiles del selector "Vista de Rol" (simulación de sesión del prototipo).
@@ -220,47 +221,6 @@ export const PAAC_SCHEMA: SchemaSection[] = [
   },
 ];
 
-export const PAAD_SCHEMA: SchemaSection[] = [
-  {
-    title: '1. Actividad de Enseñanza',
-    norm: '1) ACTIVIDAD DE ENSEÑANZA (Cursos atendidos y producción didáctica)',
-    fields: [
-      { key: 'material', label: '1.b) Preparación de Manuales, Guías de Trabajos Prácticos y Programas', type: 'text', campoPath: 'docenciaDirecta.preparacionMaterial' },
-      { key: 'otherTeach', label: '1.c) Otros trabajos de índole específicamente docente', type: 'text', campoPath: 'docenciaDirecta.otrosTrabajos' },
-    ],
-  },
-  {
-    title: '2. Investigación',
-    norm: '2) ACTIVIDADES DE INVESTIGACIÓN',
-    fields: [{ key: 'research', label: 'Proyectos de investigación vigentes', type: 'text', campoPath: 'investigacionExtension.investigacion' }],
-  },
-  {
-    title: '3. Formación de RRHH',
-    norm: '3) ACTIVIDAD DE FORMACIÓN DE RECURSOS HUMANOS',
-    fields: [{ key: 'human', label: 'Dirección de pasantes, adscriptos, becarios y tesistas', type: 'text', campoPath: 'formacionRrhh.actividades' }],
-  },
-  {
-    title: '4. Capacitación y Posgrado',
-    norm: '4) ACTIVIDADES DE FORMACIÓN ACADÉMICA Y ESPECIALIZACIÓN',
-    fields: [{ key: 'formation', label: 'Estudios de posgrado y cursos de perfeccionamiento', type: 'text', campoPath: 'capacitacion.formacionAcademica' }],
-  },
-  {
-    title: '5 a 7. Extensión y Gestión',
-    norm: '5, 6 y 7) EXTENSIÓN, GESTIÓN UNIVERSITARIA Y OTRAS ACTIVIDADES',
-    fields: [
-      { key: 'extension', label: 'Proyectos de extensión y vinculación tecnológica', type: 'text', campoPath: 'investigacionExtension.extension' },
-      { key: 'government', label: 'Actividades de administración y gobierno universitario', type: 'text', campoPath: 'investigacionExtension.gestion' },
-    ],
-  },
-  {
-    title: '8. Distribución Horaria',
-    norm: '8) DISTRIBUCIÓN HORARIA DE ACTIVIDADES DOCENTES',
-    fields: [
-      { key: 'scheduleTable', label: 'Resumen de carga horaria semanal y anual por función', type: 'table', cols: ['Función / Actividad', 'Ámbito / Cátedra', 'Hs. Semanales', 'Hs. Anuales'], campoPath: 'distribucionHoraria.resumen' },
-    ],
-  },
-];
-
 export const PEDITEMS = [
   '1. Fundamentación e introducción al perfil profesional',
   '2. Diagnóstico y articulación horizontal/vertical',
@@ -367,11 +327,13 @@ export function createInitialData() {
   ];
   const planes: PlanEstudio[] = [
     { id: 'plan-isi-448', carreraId: 'car-isi', ordenanza: 'Ord. HCS N° 448/2011', enfoque: 'COMPETENCIAS', activo: true },
+    { id: 'plan-isi-231', carreraId: 'car-isi', ordenanza: 'Ordenanza N° 231/2023', enfoque: 'COMPETENCIAS', activo: true },
     { id: 'plan-lsi-171', carreraId: 'car-lsi', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
     { id: 'plan-tui-171', carreraId: 'car-tui', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
     { id: 'plan-cham-171', carreraId: 'car-tui-cham', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
   ];
   const asignaturas: Asignatura[] = [
+    { id: 'asig-am', codigo: 'ISI-1.03', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Análisis Matemático', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Números reales. Funciones de una variable. Límite y continuidad. Derivada y aplicaciones. Integral indefinida y definida. Aplicaciones del cálculo integral.' },
     { id: 'asig-prog1', codigo: 'ISI-1.01', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
     { id: 'asig-prog2', codigo: 'ISI-1.06', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación II', anoCursada: 1, regimenDictado: '2C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Programación orientada a objetos: clases, herencia, polimorfismo. Manejo de excepciones y archivos. Pruebas unitarias.' },
     { id: 'asig-sis1', codigo: 'ISI-2.04', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
@@ -386,6 +348,7 @@ export function createInitialData() {
     { id: 'u-martin', nombre: 'Martín', apellido: 'López', dni: '30112233', email: 'auxiliar.prog@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: true, activo: true },
     { id: 'u-sofia', nombre: 'Sofía', apellido: 'Romero', dni: '32998877', email: 'sofia.romero@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-diego', nombre: 'Diego', apellido: 'Castro', dni: '29334455', email: 'diego.castro@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-lastra', nombre: 'Mariana Soledad', apellido: 'Lastra', dni: '27845612', email: 'mariana.lastra@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-uap', nombre: 'Ana', apellido: 'Suárez', dni: '27554433', email: 'uap@unlar.edu.ar', rol: 'UAP', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-dir-isi', nombre: 'María', apellido: 'Vega', dni: '25111222', email: 'direccion.isi@unlar.edu.ar', rol: 'Director', carreraId: 'car-isi', mustChangePassword: false, activo: true },
     { id: 'u-dir-lsi', nombre: 'Gabriel', apellido: 'Ruiz', dni: '26333444', email: 'direccion.lsi@unlar.edu.ar', rol: 'Director', carreraId: 'car-lsi', mustChangePassword: false, activo: true },
@@ -403,6 +366,8 @@ export function createInitialData() {
     { id: 'eq-8', asignaturaId: 'asig-aed', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: true },
     { id: 'eq-9', asignaturaId: 'asig-aed', docenteId: 'u-diego', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
     { id: 'eq-10', asignaturaId: 'asig-lab-cham', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+    { id: 'eq-am-1', asignaturaId: 'asig-am', docenteId: 'u-lastra', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+    { id: 'eq-am-2', asignaturaId: 'asig-am', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Ayudante de Primera', esResponsable: false },
     { id: 'eq-11', asignaturaId: 'asig-prog2', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-12', asignaturaId: 'asig-prog2', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
     // Equipos del ciclo 2025 (histórico): habilitan la visibilidad de planificaciones anteriores.
@@ -583,25 +548,101 @@ export function createInitialData() {
     })
   );
 
-  const docentesList = usuarios.filter((u) => u.rol === 'Docente');
-  const paads = docentesList.map((u, idx) => ({
-    id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
-    state: idx === 0 ? 'ENVIADO_A_REVISION' : idx === 2 ? 'APROBADO' : 'BORRADOR',
-    pedApproved: idx === 2, discApproved: idx === 2,
-    data: {
-      material: 'Actualización de guías de trabajos prácticos, casos de estudio y material didáctico para el aula virtual.',
-      otherTeach: 'Atención de consultas semanales, participación en tribunales examinadores y reuniones de cátedra.',
-      research: 'Integrante del proyecto de investigación en Ingeniería de Software y Calidad de Sistemas (DACEFyN).',
-      human: 'Formación y acompañamiento de ayudantes alumnos y adscriptos de la cátedra.',
-      formation: 'Curso de posgrado en Metodologías Ágiles y Docencia Universitaria.',
-      extension: 'Dictado de taller de introducción a la programación abierto a escuelas secundarias.',
-      government: 'Participación en comisiones asesoras de carrera.',
-      scheduleTable: [
-        ['Docencia Directa (Frente a alumnos)', 'Cátedras asignadas del ciclo', '6', '180'],
-        ['Preparación de material y evaluación', 'DACEFyN', '2', '60'],
-        ['Investigación / Extensión', 'Instituto de Informática', '2', '60'],
+  // ---- PAAD (Anexo III, Ord. 171/19) ----
+  const catedraDeReferencia = (docenteId: string) => {
+    const propios = equiposCatedra.filter((e) => e.docenteId === docenteId && e.cicloLectivo === 2026);
+    return (propios.find((e) => e.esResponsable) ?? propios[0])?.asignaturaId ?? null;
+  };
+  const cursosDe = (docenteId: string) =>
+    equiposCatedra
+      .filter((e) => e.docenteId === docenteId && e.cicloLectivo === 2026)
+      .map((e) => {
+        const a = asignaturas.find((x) => x.id === e.asignaturaId);
+        const car = carreras.find((c) => c.id === planes.find((p) => p.id === a?.planEstudioId)?.carreraId);
+        return `${a?.nombre} – ${a?.anoCursada}.º año ${car?.sigla} – ${e.cargo}`;
+      });
+
+  /** PAAD de ejemplo real: Lastra Mariana Soledad, Análisis Matemático (Ord. N° 231/2023). */
+  const paadLastra: PaadContenido = {
+    asignaturaId: 'asig-am',
+    listas: {
+      cursos: ['Análisis Matemático – Primer Año de Ingeniería en Sistemas de Información – comisiones A y B (teoría y práctica).'],
+      capacitaciones: [
+        'Jornadas de Enseñanza de la Matemática en Carreras de Ingeniería – UNLaR, Sede Capital – mayo de 2026 – didáctica del cálculo, área Ciencias Básicas.',
+        'Taller "Evaluación por competencias en asignaturas básicas" – modalidad virtual (DACEFyN) – agosto de 2026 – área Educación en Ingeniería.',
+      ],
+      materiales: [
+        'Guía de Trabajos Prácticos de Análisis Matemático – Ciencias Básicas – dossier – autores: Lastra M. S. y equipo de cátedra – marzo de 2026.',
+        'Cuadernillo de ingreso "Funciones y límites" – material mediado para el aula virtual – Lastra M. S. – febrero de 2026.',
+      ],
+      otrosDocentes: [
+        'Curso "GeoGebra para la enseñanza del cálculo" – Instituto de Formación Docente, La Rioja – septiembre de 2026 – destinatarios: docentes de nivel secundario – nivel: curso.',
+      ],
+      investigacion: [
+        'Proyecto "Modelización matemática en problemas de ingeniería" – estudia estrategias de modelización con estudiantes de primer año – cargo: investigadora integrante – Res. CD N° 045/25 – etapa de ejecución (segundo año).',
+      ],
+      recursosHumanos: [
+        'Ayudante de 1º: Lic. Martín López, desde 2025 – resolución de trabajos prácticos y clases de consulta – evaluación por observación de clases e informe final cuatrimestral.',
+        'Adscripto alumno: Est. Julieta Ríos, desde marzo de 2026 – elaboración de ejercicios para la guía de TP – informe final de desempeño en diciembre.',
+      ],
+      formacionAcademica: [
+        'Maestría en Enseñanza de las Ciencias Exactas (UNLaR) – 4 de 6 módulos aprobados – tesis en elaboración sobre evaluación en cálculo.',
+        'Artículo "El error como recurso en Análisis Matemático" – aprobado para las Actas del Congreso de Educación Matemática del NOA 2026.',
+      ],
+      extension: [
+        'Proyecto "Matemática en tu escuela" – dirigido a estudiantes de 5.º año de escuelas secundarias de Capital – abril a octubre de 2026 – 6 alumnos de ISI involucrados – informe de finalización en diciembre.',
+      ],
+      gestion: [
+        'Miembro del Consejo Consultivo de la carrera de Ingeniería en Sistemas de Información.',
+        'Reuniones mensuales del equipo de cátedra y del área de Ciencias Básicas.',
+      ],
+      otras: [
+        'Clases de consulta previas a las mesas de examen de julio y diciembre.',
+        'Participación en la comisión de seguimiento del Plan de Estudios Ordenanza N° 231/2023.',
       ],
     },
+    horas: {
+      ...matrizVacia(),
+      ensenanza: { lunes: '', martes: '', miercoles: '3', jueves: '', viernes: '', sabado: '' },
+      investigacion: { lunes: '', martes: '4', miercoles: '', jueves: '', viernes: '', sabado: '' },
+      formacion: { lunes: '6', martes: '', miercoles: '', jueves: '', viernes: '', sabado: '' },
+      gestion: { lunes: '', martes: '', miercoles: '', jueves: '4', viernes: '', sabado: '' },
+    },
+  };
+
+  /** PAAD genérico para el resto de los docentes de prueba. */
+  const paadGenerico = (docenteId: string): PaadContenido => ({
+    asignaturaId: catedraDeReferencia(docenteId),
+    listas: {
+      ...paadVacio().listas,
+      cursos: cursosDe(docenteId),
+      materiales: ['Actualización de guías de trabajos prácticos y material didáctico para el aula virtual – marzo de 2026.'],
+      otrosDocentes: ['Participación en tribunales examinadores y reuniones de cátedra.'],
+      investigacion: ['Integrante del proyecto "Ingeniería de Software y Calidad de Sistemas" (DACEFyN) – Res. CD N° 112/24 – etapa de ejecución.'],
+      recursosHumanos: ['Formación y acompañamiento de ayudantes alumnos y adscriptos de la cátedra.'],
+      formacionAcademica: ['Curso de posgrado en Metodologías Ágiles y Docencia Universitaria.'],
+      extension: ['Taller de introducción a la programación para escuelas secundarias – segundo cuatrimestre.'],
+      gestion: ['Participación en comisiones asesoras de carrera.'],
+    },
+    horas: {
+      ...matrizVacia(),
+      ensenanza: { lunes: '3', martes: '', miercoles: '3', jueves: '', viernes: '', sabado: '' },
+      investigacion: { lunes: '', martes: '2', miercoles: '', jueves: '', viernes: '', sabado: '' },
+      gestion: { lunes: '', martes: '', miercoles: '', jueves: '', viernes: '2', sabado: '' },
+    },
+  });
+
+  const estadoPaad: Record<string, { state: string; ok: boolean }> = {
+    'u-lucia': { state: 'ENVIADO_A_REVISION', ok: false },
+    'u-sofia': { state: 'APROBADO', ok: true },
+  };
+  const docentesList = usuarios.filter((u) => u.rol === 'Docente');
+  const paads = docentesList.map((u) => ({
+    id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
+    state: estadoPaad[u.id]?.state ?? 'BORRADOR',
+    pedApproved: estadoPaad[u.id]?.ok ?? false, discApproved: estadoPaad[u.id]?.ok ?? false,
+    data: {},
+    paad: u.id === 'u-lastra' ? paadLastra : paadGenerico(u.id),
     comments: [],
   }));
 

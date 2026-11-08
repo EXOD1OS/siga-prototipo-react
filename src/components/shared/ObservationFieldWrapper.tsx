@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 interface Props {
   fKey: string;
-  label: string;
+  label: React.ReactNode;
   campoPath: string;
   notes: any[];
   canEdit: boolean;
@@ -39,9 +39,9 @@ export function ObservationFieldWrapper({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start py-6 first:pt-0 border-b border-border last:border-b-0">
       <div className={`${showRail ? 'xl:col-span-8' : 'xl:col-span-12'} space-y-2`}>
-        <label className={`block text-xs font-semibold ${hasUnresolved ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>
+        <div className={`block text-xs font-semibold ${hasUnresolved ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>
           {label}
-        </label>
+        </div>
         <div className={hasUnresolved ? 'ring-2 ring-amber-500/70 rounded-lg bg-amber-500/5 p-0.5' : ''}>
           {children}
         </div>

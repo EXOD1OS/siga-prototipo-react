@@ -57,6 +57,34 @@ html.theme-transition *::after {
   }
 }
 
+/* Impresión del documento oficial (PAAD): solo se imprime la copia montada en <body>. */
+.print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  body:has(> .print-root) > *:not(.print-root) {
+    display: none !important;
+  }
+  body:has(> .print-root) {
+    background: #fff !important;
+  }
+  .print-root {
+    display: block;
+  }
+  .print-root ~ .print-root {
+    display: none;
+  }
+  .print-root * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.theme-transition,
   html.theme-transition * {

@@ -1,4 +1,5 @@
 // Tipos del circuito de planificaciones (PAAC) — ver context/context.md.
+import type { PaadContenido } from './paad';
 
 export type EstadoPlanif =
   | 'BORRADOR'
@@ -99,6 +100,8 @@ export interface DocumentoEditable {
   state: string;
   asignaturaId?: string;
   data: PaacData;
+  /** Contenido estructurado del PAAD (solo documentos PAAD). */
+  paad?: PaadContenido;
   comments: ObservacionDoc[];
   sinGuardar?: boolean;
   guardadoEn?: string;

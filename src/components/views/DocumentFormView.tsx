@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react';
-import { PAAC_SCHEMA, PAAD_SCHEMA, type SchemaField } from '../../data/mockData';
+import { PAAC_SCHEMA, type SchemaField } from '../../data/mockData';
 import { StatusBadge } from '../shared/StatusBadge';
 import { ObservationFieldWrapper } from '../shared/ObservationFieldWrapper';
 import { CampoSelect, CampoTexto, TablaDinamica, TablaHoras } from '../paac/CamposPaac';
+import { PaadEditor } from '../paad/PaadEditor';
 import { validarPaac, type ProblemaPaac } from '../../lib/validacionPaac';
-import type { AsigContext, DocumentoResumen, EquipoCatedra } from '../../types/estructura';
+import { armarAspectosGenerales } from '../../lib/paad';
+import { paadVacio, type PaadContenido } from '../../types/paad';
+import type { AsigContext, DocumentoResumen, EquipoCatedra, Usuario } from '../../types/estructura';
 import type { DocumentoEditable } from '../../types/planificacion';
 
 interface DocumentFormViewProps {
@@ -17,9 +20,11 @@ interface DocumentFormViewProps {
   asigContext: (id: string) => AsigContext;
   equipoDeAsig: (id: string) => EquipoCatedra[];
   fullName: (id: string) => string;
-  S: { cycle: number; docs: DocumentoResumen[]; equiposCatedra: EquipoCatedra[] };
+  S: { cycle: number; docs: DocumentoResumen[]; equiposCatedra: EquipoCatedra[]; usuarios: Usuario[] };
   onBack: () => void;
   onUpdateField: (fKey: string, val: string | string[][]) => void;
+  /** Reemplaza el contenido estructurado de un PAAD. */
+  onUpdatePaad: (c: PaadContenido) => void;
   onSaveDraft: () => void;
   onSubmitDoc: () => void;
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
@@ -51,6 +56,7 @@ export function DocumentFormView({
   S,
   onBack,
   onUpdateField,
+  onUpdatePaad,
   onSaveDraft,
   onSubmitDoc,
   onAddObs,
@@ -63,11 +69,48 @@ export function DocumentFormView({
   const [confirmar, setConfirmar] = useState(false);
   const problemasRef = useRef<HTMLDivElement>(null);
 
+  // PAAD (Anexo III): editor y vista previa propios del documento oficial.
+  if (d.type === 'PAAD') {
+    const misEquipos = S.equiposCatedra.filter((e) => e.docenteId === d.owner && e.cicloLectivo === d.cycle);
+    const catedras = misEquipos.map((e) => {
+      const c = asigContext(e.asignaturaId);
+      return { id: e.asignaturaId, label: `${c.carrera?.sigla ?? ''} · ${c.asig?.nombre ?? e.asignaturaId}` };
+    });
+    // Por defecto, la cátedra donde es responsable (o la primera).
+    const porDefecto = misEquipos.find((e) => e.esResponsable)?.asignaturaId ?? catedras[0]?.id ?? null;
+    const contenido = d.paad ?? paadVacio(porDefecto);
+    return (
+      <PaadEditor
+        d={{ ...d, paad: contenido }}
+        docenteNombre={fullName(d.owner)}
+        role={role}
+        canEdit={canEdit}
+        canSubmit={canSubmit}
+        canObserve={canObserve}
+        aspectos={armarAspectosGenerales({
+          contenido,
+          ownerId: d.owner,
+          ciclo: d.cycle,
+          usuarios: S.usuarios,
+          equipos: S.equiposCatedra,
+          asigContext,
+        })}
+        catedras={catedras}
+        onBack={onBack}
+        onUpdatePaad={onUpdatePaad}
+        onSaveDraft={onSaveDraft}
+        onSubmitDoc={onSubmitDoc}
+        onAddObs={onAddObs}
+        onResolveObs={onResolveObs}
+      />
+    );
+  }
+
   const esPaac = d.type === 'PAAC';
   const ctx = esPaac && d.asignaturaId ? asigContext(d.asignaturaId) : null;
   const enfoque = ctx?.plan?.enfoque;
   // En planes tradicionales la matriz de competencias no aplica.
-  const secs = (esPaac ? PAAC_SCHEMA : PAAD_SCHEMA).map((s) => ({
+  const secs = PAAC_SCHEMA.map((s) => ({
     ...s,
     fields: s.fields.filter((f) => !(f.key === 'competencias' && enfoque !== 'COMPETENCIAS')),
   }));
@@ -328,41 +371,6 @@ export function DocumentFormView({
                       </tbody>
                     </table>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {activeSec === 0 && !esPaac && (
-              <div className="mb-6 space-y-4 border-b border-border pb-6">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
-                  1.a) Asignaturas atendidas en el ciclo lectivo (autocompletado desde Equipos de Cátedra)
-                </h3>
-                <div className="overflow-x-auto rounded-lg border border-border">
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-border bg-background text-muted">
-                        <th className="p-3">Carrera</th>
-                        <th className="p-3">Asignatura</th>
-                        <th className="p-3">Cargo</th>
-                        <th className="p-3">Horas totales</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {S.equiposCatedra
-                        .filter((e) => e.docenteId === d.owner && e.cicloLectivo === S.cycle)
-                        .map((eq) => {
-                          const c = asigContext(eq.asignaturaId);
-                          return (
-                            <tr key={eq.id}>
-                              <td className="p-3 font-semibold text-primary">{c.carrera?.sigla}</td>
-                              <td className="p-3 font-medium text-ink">{c.asig?.nombre}</td>
-                              <td className="p-3 text-ink">{eq.cargo}</td>
-                              <td className="p-3 text-ink">{c.asig?.horasTotales} hs</td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             )}

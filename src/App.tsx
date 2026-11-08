@@ -4,6 +4,8 @@ import { Header, type NotificationItem } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PaadModal } from './components/shared/PaadModal';
 import { Toast, type ToastTone } from './components/shared/Toast';
+import { armarAspectosGenerales } from './lib/paad';
+import { paadVacio } from './types/paad';
 import { PlanificacionesList } from './components/views/PlanificacionesList';
 import { PaadsListView } from './components/views/PaadsListView';
 import { DocumentFormView } from './components/views/DocumentFormView';
@@ -338,6 +340,13 @@ export default function App() {
                   return doc;
                 })
               }
+              onUpdatePaad={(contenido) =>
+                updateActiveDoc((doc) => {
+                  doc.paad = contenido;
+                  doc.sinGuardar = true;
+                  return doc;
+                })
+              }
               onSaveDraft={() => {
                 updateActiveDoc((doc) => {
                   doc.sinGuardar = false;
@@ -593,10 +602,16 @@ export default function App() {
       {modalPaad && (
         <PaadModal
           paad={modalPaad}
+          aspectos={armarAspectosGenerales({
+            contenido: modalPaad.paad ?? paadVacio(),
+            ownerId: modalPaad.owner,
+            ciclo: modalPaad.cycle,
+            usuarios: S.usuarios,
+            equipos: S.equiposCatedra,
+            asigContext,
+          })}
           docenteName={fullName(modalPaad.owner)}
-          carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.codigo || ''}`}
-          misEquipos={S.equiposCatedra.filter((e) => e.docenteId === modalPaad.owner && e.cicloLectivo === S.cycle)}
-          asigContext={asigContext}
+          carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.sigla || ''}`}
           onClose={() => setModalPaadId(null)}
         />
       )}
