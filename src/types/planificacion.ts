@@ -1,5 +1,6 @@
 // Tipos del circuito de planificaciones (PAAC) — ver context/context.md.
 import type { PaadContenido } from './paad';
+import { paacTieneContenido, type PaacContenido } from './paac';
 
 export type EstadoPlanif =
   | 'BORRADOR'
@@ -82,6 +83,8 @@ export interface PaacDoc {
   expediente: string;
   resolucion: string;
   data: PaacData;
+  /** Contenido estructurado del PAAC (reemplaza a `data`, que queda solo por compatibilidad). */
+  paac?: PaacContenido;
   pedReport: InformeEvaluacion;
   discReport: InformeEvaluacion;
   comments: ObservacionDoc[];
@@ -102,6 +105,8 @@ export interface DocumentoEditable {
   data: PaacData;
   /** Contenido estructurado del PAAD (solo documentos PAAD). */
   paad?: PaadContenido;
+  /** Contenido estructurado del PAAC (solo documentos PAAC). */
+  paac?: PaacContenido;
   comments: ObservacionDoc[];
   sinGuardar?: boolean;
   guardadoEn?: string;
@@ -112,15 +117,16 @@ export function esHistorica(d: Pick<PaacDoc, 'state'>): boolean {
 }
 
 /** Un PAAC está iniciado si tiene algún campo cargado o ya salió de Borrador. */
-export function paacIniciado(d: Pick<PaacDoc, 'state' | 'data'>): boolean {
+export function paacIniciado(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): boolean {
   if (d.state !== 'BORRADOR') return true;
+  if (d.paac) return paacTieneContenido(d.paac);
   return Object.values(d.data ?? {}).some((v) => (Array.isArray(v) ? v.length > 0 : !!v && v.trim() !== ''));
 }
 
 /** Etapa de elaboración del documento PAAC (para la columna PAAC de la bandeja). */
 export type EtapaPaac = 'SIN_INICIAR' | 'EN_ELABORACION' | 'EN_CORRECCION' | 'PRESENTADO';
 
-export function etapaPaac(d: Pick<PaacDoc, 'state' | 'data'>): EtapaPaac {
+export function etapaPaac(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): EtapaPaac {
   if (!paacIniciado(d)) return 'SIN_INICIAR';
   if (d.state === 'BORRADOR') return 'EN_ELABORACION';
   if (d.state === 'OBSERVADO') return 'EN_CORRECCION';

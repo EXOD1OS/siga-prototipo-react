@@ -51,6 +51,10 @@ export interface Asignatura {
   horasSemanales: number;
   horasTotales: number;
   contenidosMinimos: string;
+  /** Nivel de intensidad de la formación práctica (1, 2 o 3), si la cátedra lo tiene cargado. */
+  nivelIntensidad?: string;
+  /** Relación teórica-práctica (ej. "T = P"), si la cátedra la tiene cargada. */
+  relacionTeoricaPractica?: string;
 }
 
 /**

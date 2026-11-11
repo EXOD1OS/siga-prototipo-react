@@ -332,10 +332,10 @@ export default function App() {
               fullName={fullName}
               S={S}
               onBack={() => setPage(currentDoc.type === 'PAAD' && !role.startsWith('DOCENTE') ? 'paads' : 'planificaciones')}
-              onUpdateField={(fKey, val) =>
+              onUpdatePaac={(contenido) =>
                 updateActiveDoc((doc) => {
                   // Los cambios se reflejan en el estado al instante; el borrador marca que no se guardó.
-                  doc.data[fKey] = val;
+                  doc.paac = contenido;
                   doc.sinGuardar = true;
                   return doc;
                 })

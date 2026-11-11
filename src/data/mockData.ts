@@ -11,6 +11,8 @@ import type {
   UsuarioConCatedras,
 } from '../types/estructura';
 import { matrizVacia, paadVacio, type PaadContenido } from '../types/paad';
+import { horarioVacio, paacVacio, type PaacContenido, type SemanaCronograma } from '../types/paac';
+import { paacDesdeDatosAnteriores } from '../lib/paac';
 
 /**
  * Perfiles del selector "Vista de Rol" (simulación de sesión del prototipo).
@@ -24,202 +26,6 @@ export const ROLES: Record<string, string> = {
   DIRECCION_CARRERA: 'Dirección de Carrera',
   CONSEJO_DEPARTAMENTAL: 'Consejo Departamental',
 };
-
-/** Columna tipada de una tabla dinámica del documento. */
-export interface ColumnSpec {
-  label: string;
-  /** `equipo`: selector con los integrantes del equipo de cátedra. */
-  type?: 'text' | 'number' | 'select' | 'date' | 'equipo';
-  options?: string[];
-  required?: boolean;
-  placeholder?: string;
-  /** Ancho sugerido (clase Tailwind). */
-  width?: string;
-}
-
-export interface SchemaField {
-  key: string;
-  label: string;
-  /** `horas`: tabla fija de distribución horaria con totales calculados. */
-  type: 'text' | 'table' | 'select' | 'horas';
-  /** Columnas de texto simple (esquema PAAD). */
-  cols?: string[];
-  /** Columnas tipadas (esquema PAAC). Si existen, tienen prioridad sobre `cols`. */
-  columns?: ColumnSpec[];
-  options?: string[];
-  required?: boolean;
-  /** Mínimo de filas exigido al presentar (tablas). */
-  minRows?: number;
-  hint?: string;
-  addLabel?: string;
-  /** Fila nueva precargada (recibe la cantidad de filas actuales). */
-  newRow?: (n: number) => string[];
-  campoPath: string;
-}
-
-export interface SchemaSection {
-  title: string;
-  norm: string;
-  fields: SchemaField[];
-}
-
-/** Filas fijas de la Distribución Horaria. `computa`: suma para la carga horaria del plan. */
-export const HORAS_ACTIVIDADES = [
-  { label: 'Clases teóricas', computa: true },
-  { label: 'Clases prácticas / resolución de problemas', computa: true },
-  { label: 'Laboratorio / trabajo de campo / aula de informática', computa: true },
-  { label: 'Consulta y tutoría de cátedra', computa: false },
-] as const;
-
-export const TIPOS_CLASE = ['Teórica', 'Práctica', 'Teórico-práctica', 'Laboratorio', 'Evaluación', 'Consulta'];
-
-export const PAAC_SCHEMA: SchemaSection[] = [
-  { title: 'A. Aspectos Generales', norm: 'A. DATOS DE ENCABEZADO Y EQUIPO DOCENTE', fields: [] },
-  {
-    title: '1. Fundamentación y Diagnóstico',
-    norm: '1. FUNDAMENTACIÓN Y DIAGNÓSTICO',
-    fields: [
-      { key: 'intro', label: '1.1. Fundamentación e importancia en el plan de estudios', type: 'text', required: true, campoPath: 'fundamentacionDiagnostico.introduccion' },
-      { key: 'diag', label: '1.2. Diagnóstico: articulación horizontal/vertical e infraestructura', type: 'text', required: true, campoPath: 'fundamentacionDiagnostico.diagnostico' },
-    ],
-  },
-  {
-    title: '2. Objetivos y Competencias',
-    norm: '2. OBJETIVOS GENERALES Y MATRIZ DE COMPETENCIAS (ORD. 448/11)',
-    fields: [
-      { key: 'concept', label: '2.1. Objetivos conceptuales', type: 'text', required: true, campoPath: 'objetivosGenerales.conceptuales' },
-      { key: 'procedure', label: '2.2. Objetivos procedimentales', type: 'text', required: true, campoPath: 'objetivosGenerales.procedimentales' },
-      { key: 'attitude', label: '2.3. Objetivos actitudinales', type: 'text', required: true, campoPath: 'objetivosGenerales.actitudinales' },
-      {
-        key: 'competencias', label: '2.4. Matriz de Competencias (Ord. HCS 448/11 - Nivel de Aporte 0 a 3)', type: 'table',
-        hint: 'Obligatoria en planes por competencias.', addLabel: 'Agregar competencia',
-        columns: [
-          { label: 'Tipo', type: 'select', options: ['Genérica', 'Específica'], required: true, width: 'w-32' },
-          { label: 'Descripción de la competencia', required: true },
-          { label: 'Nivel de aporte', type: 'select', options: ['0', '1', '2', '3'], required: true, width: 'w-24' },
-          { label: 'Descriptores de aprendizaje' },
-        ],
-        campoPath: 'paacCompetencias.matriz',
-      },
-    ],
-  },
-  {
-    title: '3. Metodología de Enseñanza',
-    norm: '3. METODOLOGÍA DE ENSEÑANZA Y RECURSOS',
-    fields: [
-      { key: 'method', label: '3.1. Metodología de clases teóricas, prácticas y de laboratorio', type: 'text', required: true, campoPath: 'metodologiaEnsenanza.metodologia' },
-      { key: 'resources', label: '3.2. Recursos didácticos y entorno virtual', type: 'text', campoPath: 'metodologiaEnsenanza.recursos' },
-    ],
-  },
-  {
-    title: '4. Contenidos y Unidades',
-    norm: 'B. ASPECTOS CURRICULARES · 1. UNIDADES Y CONTENIDOS',
-    fields: [
-      {
-        key: 'units', label: 'Unidades temáticas y desarrollo analítico', type: 'table', required: true, minRows: 1, addLabel: 'Agregar unidad',
-        newRow: (n) => [`Unidad ${n + 1}: `, ''],
-        columns: [
-          { label: 'Unidad', required: true, width: 'w-64' },
-          { label: 'Contenidos analíticos', required: true },
-        ],
-        campoPath: 'aspectosCurriculares.unidades',
-      },
-    ],
-  },
-  {
-    title: '5. Trabajos Prácticos',
-    norm: '2 y 3. PLANIFICACIÓN DE TRABAJOS PRÁCTICOS Y LABORATORIO',
-    fields: [
-      {
-        key: 'tp', label: 'Planificación de Trabajos Prácticos', type: 'table', required: true, minRows: 1, addLabel: 'Agregar Trabajo Práctico',
-        newRow: (n) => [String(n + 1), '', 'Individual', 'Aula', '', ''],
-        columns: [
-          { label: 'N° TP', type: 'number', required: true, width: 'w-16' },
-          { label: 'Título / Tema', required: true },
-          { label: 'Modalidad', type: 'select', options: ['Individual', 'Grupal'], required: true, width: 'w-28' },
-          { label: 'Ámbito', type: 'select', options: ['Laboratorio', 'Aula', 'Virtual'], required: true, width: 'w-28' },
-          { label: 'Horas est.', type: 'number', required: true, width: 'w-20' },
-          { label: 'Criterio / fecha tentativa de entrega', placeholder: 'Ej. Semana 4 · rúbrica', width: 'w-56' },
-        ],
-        campoPath: 'trabajosPracticos.listado',
-      },
-      { key: 'lab', label: 'Programa de Trabajos Prácticos de Laboratorio y Equipamiento', type: 'text', campoPath: 'trabajosPracticos.laboratorio' },
-    ],
-  },
-  {
-    title: '6. Distribución Horaria',
-    norm: '7. DISTRIBUCIÓN DEL CRÉDITO HORARIO Y DEDICACIÓN',
-    fields: [
-      { key: 'horas', label: 'Carga horaria semanal por tipo de actividad', type: 'horas', required: true, campoPath: 'distribucionHoraria.actividades' },
-    ],
-  },
-  {
-    title: '7. Cronograma de Clases',
-    norm: 'CRONOGRAMA / PLAN DE CLASES',
-    fields: [
-      {
-        key: 'cronograma', label: 'Plan de clases por semana', type: 'table', required: true, minRows: 1, addLabel: 'Agregar clase',
-        newRow: (n) => [`Semana ${n + 1}`, '', 'Teórico-práctica', ''],
-        columns: [
-          { label: 'Semana / fecha', required: true, width: 'w-32' },
-          { label: 'Tema a dictar', required: true },
-          { label: 'Tipo de clase', type: 'select', options: TIPOS_CLASE, required: true, width: 'w-36' },
-          { label: 'Docente(s) a cargo', type: 'equipo', required: true, width: 'w-48' },
-        ],
-        campoPath: 'cronograma.clases',
-      },
-    ],
-  },
-  {
-    title: '8. Evaluación y Promoción',
-    norm: '4. METODOLOGÍA DE EVALUACIÓN Y RÉGIMEN DE APROBACIÓN',
-    fields: [
-      { key: 'eval', label: '8.1. Criterios e instrumentos de evaluación', type: 'text', required: true, campoPath: 'metodologiaEvaluacion.criterios' },
-      {
-        key: 'regimenAprob', label: '8.2. Régimen de aprobación', type: 'select', required: true,
-        options: ['Promoción directa y regularidad', 'Solo regularidad (examen final)', 'Promoción directa sin examen final'],
-        campoPath: 'metodologiaEvaluacion.regimenAprobacion.tipo',
-      },
-      {
-        key: 'asistenciaMin', label: '8.3. Asistencia mínima exigida', type: 'select', required: true,
-        options: ['60 %', '70 %', '75 %', '80 %'], campoPath: 'metodologiaEvaluacion.regimenAprobacion.asistencia',
-      },
-      { key: 'regular', label: '8.4. Condiciones de regularidad', type: 'text', required: true, campoPath: 'metodologiaEvaluacion.regimenAprobacion.regular' },
-      { key: 'promotion', label: '8.5. Condiciones de promoción directa', type: 'text', hint: 'Obligatorio si el régimen admite promoción.', campoPath: 'metodologiaEvaluacion.regimenAprobacion.promocion' },
-      { key: 'free', label: '8.6. Condiciones de examen libre', type: 'text', required: true, campoPath: 'metodologiaEvaluacion.regimenAprobacion.libre' },
-      {
-        key: 'parciales', label: '8.7. Fechas de exámenes parciales y recuperatorios', type: 'table', required: true, minRows: 1, addLabel: 'Agregar instancia',
-        newRow: (n) => [n % 2 === 0 ? `Parcial ${n / 2 + 1}` : `Recuperatorio ${(n + 1) / 2}`, '', 'Escrito', ''],
-        columns: [
-          { label: 'Instancia', type: 'select', options: ['Parcial 1', 'Recuperatorio 1', 'Parcial 2', 'Recuperatorio 2', 'Integrador', 'Coloquio'], required: true, width: 'w-40' },
-          { label: 'Fecha', type: 'date', required: true, width: 'w-40' },
-          { label: 'Modalidad', type: 'select', options: ['Escrito', 'Oral', 'Práctico en máquina', 'Entrega de proyecto'], required: true, width: 'w-44' },
-          { label: 'Unidades evaluadas' },
-        ],
-        campoPath: 'metodologiaEvaluacion.instancias',
-      },
-    ],
-  },
-  {
-    title: '9. Bibliografía',
-    norm: '5. BIBLIOGRAFÍA BÁSICA Y COMPLEMENTARIA',
-    fields: [
-      {
-        key: 'books', label: 'Bibliografía', type: 'table', required: true, minRows: 1, addLabel: 'Agregar ítem bibliográfico',
-        newRow: () => ['Básica', '', '', '', '', ''],
-        columns: [
-          { label: 'Tipo', type: 'select', options: ['Básica', 'Complementaria'], required: true, width: 'w-36' },
-          { label: 'Autor/es', required: true },
-          { label: 'Título', required: true },
-          { label: 'Editorial', width: 'w-32' },
-          { label: 'Año', type: 'number', required: true, width: 'w-20' },
-          { label: 'Enlace / disponibilidad', placeholder: 'URL o "Biblioteca central"', width: 'w-48' },
-        ],
-        campoPath: 'bibliografia.items',
-      },
-    ],
-  },
-];
 
 export const PEDITEMS = [
   '1. Fundamentación e introducción al perfil profesional',
@@ -334,6 +140,7 @@ export function createInitialData() {
   ];
   const asignaturas: Asignatura[] = [
     { id: 'asig-am', codigo: 'ISI-1.03', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Análisis Matemático', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Números reales. Funciones de una variable. Límite y continuidad. Derivada y aplicaciones. Integral indefinida y definida. Aplicaciones del cálculo integral.' },
+    { id: 'asig-aed1', codigo: 'ISI-1.02', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Algoritmo y Estructura de Datos I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Resolución de problemas y algoritmos. Tipos de datos simples, expresiones y estructuras de control. Modularización: funciones y procedimientos. Recursividad. Estructuras de datos estáticas: arreglos, cadenas y registros. Algoritmos de búsqueda y ordenamiento. Nociones de complejidad algorítmica.' },
     { id: 'asig-prog1', codigo: 'ISI-1.01', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
     { id: 'asig-prog2', codigo: 'ISI-1.06', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación II', anoCursada: 1, regimenDictado: '2C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Programación orientada a objetos: clases, herencia, polimorfismo. Manejo de excepciones y archivos. Pruebas unitarias.' },
     { id: 'asig-sis1', codigo: 'ISI-2.04', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
@@ -349,6 +156,8 @@ export function createInitialData() {
     { id: 'u-sofia', nombre: 'Sofía', apellido: 'Romero', dni: '32998877', email: 'sofia.romero@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-diego', nombre: 'Diego', apellido: 'Castro', dni: '29334455', email: 'diego.castro@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-lastra', nombre: 'Mariana Soledad', apellido: 'Lastra', dni: '27845612', email: 'mariana.lastra@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-campazzo', nombre: 'Eduardo Nicolás', apellido: 'Campazzo', dni: '30556677', email: 'eduardo.campazzo@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
+    { id: 'u-guzman', nombre: 'Alejandra Elena', apellido: 'Guzmán', dni: '29776655', email: 'alejandra.guzman@unlar.edu.ar', rol: 'Docente', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-uap', nombre: 'Ana', apellido: 'Suárez', dni: '27554433', email: 'uap@unlar.edu.ar', rol: 'UAP', carreraId: null, mustChangePassword: false, activo: true },
     { id: 'u-dir-isi', nombre: 'María', apellido: 'Vega', dni: '25111222', email: 'direccion.isi@unlar.edu.ar', rol: 'Director', carreraId: 'car-isi', mustChangePassword: false, activo: true },
     { id: 'u-dir-lsi', nombre: 'Gabriel', apellido: 'Ruiz', dni: '26333444', email: 'direccion.lsi@unlar.edu.ar', rol: 'Director', carreraId: 'car-lsi', mustChangePassword: false, activo: true },
@@ -366,6 +175,8 @@ export function createInitialData() {
     { id: 'eq-8', asignaturaId: 'asig-aed', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: true },
     { id: 'eq-9', asignaturaId: 'asig-aed', docenteId: 'u-diego', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
     { id: 'eq-10', asignaturaId: 'asig-lab-cham', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+    { id: 'eq-aed1-1', asignaturaId: 'asig-aed1', docenteId: 'u-campazzo', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
+    { id: 'eq-aed1-2', asignaturaId: 'asig-aed1', docenteId: 'u-guzman', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: false },
     { id: 'eq-am-1', asignaturaId: 'asig-am', docenteId: 'u-lastra', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-am-2', asignaturaId: 'asig-am', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Ayudante de Primera', esResponsable: false },
     { id: 'eq-11', asignaturaId: 'asig-prog2', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
@@ -420,7 +231,7 @@ export function createInitialData() {
       },
       discReport: { items: {}, dictamen: 'PENDIENTE', obsDisciplinares: '' },
       comments: [
-        { id: 'obs-1', field: 'diag', campoPath: 'fundamentacionDiagnostico.diagnostico', section: 1, area: 'uap', author: 'Ana Suárez (UAP)', text: 'Explicitar cómo se coordina horizontalmente con Álgebra y Lógica del primer cuatrimestre.', date: '10/04/2026', resolved: false },
+        { id: 'obs-1', field: 'diagnostico.correlativas', campoPath: 'paac.diagnostico.correlativas', section: 2, area: 'uap', author: 'Ana Suárez (UAP)', text: 'Explicitar cómo se coordina horizontalmente con Álgebra y Lógica del primer cuatrimestre.', date: '10/04/2026', resolved: false },
       ],
     },
     {
@@ -496,7 +307,154 @@ export function createInitialData() {
     type: 'PAAC', expediente: '', resolucion: '', pedApproved: false, discApproved: false, comments: [], ...base,
   });
 
+  // ---- PAAC completo de ejemplo: Algoritmo y Estructura de Datos I (ISI, Ord. 231/2023) ----
+  // Semanas: [unidad, hs teoría, TP, hs práctica, TPL, hs lab., evaluación, hs evaluación]
+  const semanasAed: [string, string, string, string, string, string, string, string][] = [
+    ['1', '3', '1', '3', '', '', '', ''],
+    ['1', '3', '1', '3', '', '', '', ''],
+    ['2', '3', '2', '2', '1', '1', '', ''],
+    ['2', '3', '2', '2', '1', '1', '', ''],
+    ['2', '2', '2', '2', '2', '2', '', ''],
+    ['3', '3', '3', '2', '2', '1', '', ''],
+    ['3', '2', '', '', '', '', '1er Parcial', '4'],
+    ['3', '3', '3', '3', '', '', '', ''],
+    ['4', '3', '4', '2', '3', '1', '', ''],
+    ['4', '3', '4', '2', '3', '1', '', ''],
+    ['4', '2', '4', '2', '', '', 'Recuperatorio 1er Parcial', '2'],
+    ['5', '3', '5', '2', '4', '1', '', ''],
+    ['5', '3', '5', '2', '4', '1', '', ''],
+    ['5', '2', '', '', '', '', '2do Parcial', '4'],
+    ['', '', '', '', '', '', 'Recuperatorio 2do Parcial / Coloquio integrador', '6'],
+  ];
+  const cronogramaAed: SemanaCronograma[] = semanasAed.map(([unidad, horasTeoria, tp, horasPractica, tpl, horasLab, evaluacion, horasEval], i) => ({
+    id: `aed-sem-${i + 1}`,
+    semana: String(i + 1),
+    unidad,
+    horasTeoria,
+    tp,
+    horasPractica,
+    tpl,
+    horasLab,
+    tplCampo: '',
+    horasCampo: '',
+    evaluacion,
+    horasEval,
+  }));
+  const ELIBRO = 'https://elibro.net/es/lc/unlariojabiblio/';
+
+  const paacAed1: PaacContenido = {
+    ...paacVacio(),
+    nivelIntensidad: '2',
+    relacionTP: 'T = P',
+    importancia:
+      '<p><strong>Algoritmo y Estructura de Datos I</strong> se ubica en el primer cuatrimestre del primer año, dentro del Bloque de <strong>Tecnologías Básicas</strong> del Plan de Estudios (Ordenanza N° 231/2023). Es la primera asignatura del área de Programación y constituye la base conceptual y práctica sobre la que se construyen las asignaturas de desarrollo de software de los años siguientes.</p><p>Aporta al perfil del graduado la capacidad de analizar problemas, formular algoritmos correctos y eficientes e implementarlos en un lenguaje de programación, articulando el razonamiento lógico-matemático con la práctica de la ingeniería de software.</p>',
+    competenciasGenerales: { CG1: 3, CG2: 1, CG3: 0, CG4: 2, CG5: 1, CG6: 2, CG7: 1, CG8: 1, CG9: 2, CG10: 0 },
+    competenciasEspecificas: [
+      { id: 'aed-ce-1', codigo: 'CE1.1', detalle: 'Especificar, proyectar y desarrollar sistemas de información.', nivel: 1 },
+      { id: 'aed-ce-2', codigo: 'CE1.2', detalle: 'Especificar, proyectar y desarrollar sistemas de comunicación de datos.', nivel: 0 },
+      { id: 'aed-ce-3', codigo: 'CE1.3', detalle: 'Especificar, proyectar y desarrollar software.', nivel: 3 },
+      { id: 'aed-ce-4', codigo: 'CE2.1', detalle: 'Proyectar y dirigir lo referido a seguridad informática.', nivel: 0 },
+      { id: 'aed-ce-5', codigo: 'CE3.1', detalle: 'Establecer métricas y normas de calidad de software.', nivel: 1 },
+      { id: 'aed-ce-6', codigo: 'CE4.1', detalle: 'Certificar el funcionamiento, condición de uso o estado de los sistemas de información, de comunicación de datos y del software.', nivel: 0 },
+      { id: 'aed-ce-7', codigo: 'CE5.1', detalle: 'Dirigir y controlar la implementación, operación y mantenimiento de los sistemas de información y del software.', nivel: 1 },
+    ],
+    diagnostico: {
+      correlativas:
+        '<p>Al ser una asignatura del primer cuatrimestre no tiene correlativas anteriores: retoma los saberes de lógica y matemática del Curso de Ingreso. Es correlativa anterior de <strong>Algoritmo y Estructura de Datos II</strong> y de <strong>Paradigmas de Programación</strong>, a las que ofrece el dominio de la programación estructurada, la modularización y las estructuras de datos estáticas.</p>',
+      mismoAnio:
+        '<p>Se articula con <strong>Análisis Matemático</strong> y <strong>Álgebra y Geometría Analítica</strong> (funciones, sucesiones y matrices aplicadas en los ejercicios de arreglos) y con <strong>Sistemas y Organizaciones</strong>, que aporta problemas reales para los trabajos prácticos. Se coordinan fechas de parciales para evitar superposiciones.</p>',
+      estudiantes:
+        '<ul><li>Ingresantes con conocimientos previos dispares de programación (la mayoría sin experiencia).</li><li>Alrededor de un 20 % de recursantes, con trayectorias interrumpidas por motivos laborales.</li><li>Acceso desigual a computadora personal: se garantiza el uso del laboratorio y del Campus Virtual.</li></ul><p>Se recomienda reforzar las tutorías de consulta y las actividades de nivelación en las primeras semanas.</p>',
+      infraestructura:
+        '<ul><li>Aula con proyector para las clases teóricas.</li><li>Laboratorio de Informática con un puesto cada dos estudiantes y entorno de desarrollo instalado.</li><li>Conectividad a internet y aula en el Campus Virtual UNLaR.</li><li>Acceso a la Biblioteca y a la plataforma eLibro.</li></ul>',
+    },
+    objetivosCarrera:
+      '<p>Formar ingenieros e ingenieras en Sistemas de Información capaces de concebir, diseñar, desarrollar, implementar y gestionar sistemas de información y software de calidad, con sólida formación científica y tecnológica, actitud ética y compromiso con el desarrollo regional, según el Diseño Curricular del Plan de Estudios y las normativas ministeriales vigentes.</p>',
+    proposito:
+      '<p>Que las y los estudiantes desarrollen el pensamiento algorítmico y adquieran las técnicas de programación estructurada y el uso de estructuras de datos estáticas necesarias para resolver problemas computacionales de manera correcta, legible y eficiente.</p>',
+    resultados: [
+      { id: 'aed-ra-1', codigo: 'RA1', descripcion: 'Formula algoritmos para resolver problemas computacionales simples, aplicando análisis, diseño descendente y verificación de su corrección.' },
+      { id: 'aed-ra-2', codigo: 'RA2', descripcion: 'Implementa programas estructurados en un lenguaje de alto nivel utilizando tipos de datos simples, estructuras de control y modularización.' },
+      { id: 'aed-ra-3', codigo: 'RA3', descripcion: 'Utiliza arreglos, registros y cadenas para representar y manipular colecciones de datos, seleccionando la estructura adecuada al problema.' },
+      { id: 'aed-ra-4', codigo: 'RA4', descripcion: 'Aplica algoritmos de búsqueda y ordenamiento y compara su eficiencia mediante un análisis elemental de complejidad.' },
+      { id: 'aed-ra-5', codigo: 'RA5', descripcion: 'Trabaja colaborativamente en la resolución de problemas y comunica las soluciones con documentación técnica clara.' },
+    ],
+    metodologia:
+      '<p>Se adopta un enfoque de <strong>Aprendizaje Centrado en el Estudiante</strong>. Las clases teóricas presentan los conceptos a partir de problemas y se complementan con material de <em>aula invertida</em> en el Campus Virtual UNLaR.</p><ul><li>Clases prácticas de resolución de problemas en pequeños grupos.</li><li>Laboratorio con codificación, prueba y depuración de programas.</li><li>Cuestionarios con retroalimentación inmediata y desafíos con dinámicas de gamificación.</li><li>Tutorías de consulta presenciales y foros en el aula virtual.</li></ul>',
+    propuesta: [
+      { id: 'aed-pr-1', competencia: 'CG1, CE1.3', ra: 'RA1', unidades: 'Unidad 1', guiaTp: 'TP N° 1', actividad: 'Resolución guiada de problemas y pruebas de escritorio.', estrategia: 'Aprendizaje basado en problemas.' },
+      { id: 'aed-pr-2', competencia: 'CG4, CE1.3', ra: 'RA2', unidades: 'Unidades 2 y 3', guiaTp: 'TP N° 2 y 3', actividad: 'Codificación y depuración de programas en laboratorio.', estrategia: 'Práctica de laboratorio y aula invertida.' },
+      { id: 'aed-pr-3', competencia: 'CG1, CE1.1', ra: 'RA3', unidades: 'Unidad 4', guiaTp: 'TP N° 4', actividad: 'Ejercicios en el Campus Virtual con autocorrección.', estrategia: 'Gamificación y cuestionarios.' },
+      { id: 'aed-pr-4', competencia: 'CG4, CE3.1', ra: 'RA4', unidades: 'Unidad 5', guiaTp: 'TP N° 5', actividad: 'Medición de tiempos de ejecución y comparación de algoritmos.', estrategia: 'Trabajo colaborativo en laboratorio.' },
+      { id: 'aed-pr-5', competencia: 'CG6, CG7', ra: 'RA5', unidades: 'Todas', guiaTp: 'TP N° 3 y 5', actividad: 'Defensa oral de las soluciones grupales.', estrategia: 'Trabajo colaborativo y exposición.' },
+    ],
+    unidades: [
+      { id: 'aed-un-1', numero: '1', titulo: 'Resolución de problemas y algoritmos', contenidos: '<ul><li>Concepto de problema, algoritmo y programa.</li><li>Etapas de la resolución de problemas con computadora.</li><li>Representación de algoritmos: pseudocódigo y diagramas de flujo.</li><li>Diseño descendente y refinamiento sucesivo.</li></ul>', resultados: 'RA1' },
+      { id: 'aed-un-2', numero: '2', titulo: 'Tipos de datos, expresiones y estructuras de control', contenidos: '<ul><li>Datos simples, constantes y variables.</li><li>Operadores y expresiones aritméticas, relacionales y lógicas.</li><li>Estructuras secuencial, condicional y repetitiva.</li><li>Prueba de escritorio y depuración.</li></ul>', resultados: 'RA1, RA2' },
+      { id: 'aed-un-3', numero: '3', titulo: 'Modularización', contenidos: '<ul><li>Funciones y procedimientos.</li><li>Pasaje de parámetros por valor y por referencia.</li><li>Ámbito y tiempo de vida de las variables.</li><li>Recursividad: concepto y ejemplos simples.</li></ul>', resultados: 'RA2' },
+      { id: 'aed-un-4', numero: '4', titulo: 'Estructuras de datos estáticas', contenidos: '<ul><li>Arreglos unidimensionales y bidimensionales.</li><li>Cadenas de caracteres.</li><li>Registros y arreglos de registros.</li></ul>', resultados: 'RA3' },
+      { id: 'aed-un-5', numero: '5', titulo: 'Búsqueda, ordenamiento y nociones de complejidad', contenidos: '<ul><li>Búsqueda secuencial y binaria.</li><li>Ordenamiento por burbuja, selección e inserción.</li><li>Intercalación de arreglos ordenados.</li><li>Noción de eficiencia y orden de complejidad.</li></ul>', resultados: 'RA4' },
+    ],
+    tpIntro:
+      '<p>Los trabajos prácticos se desarrollan en las clases prácticas y en el Laboratorio de Informática (T.P.L.), con entregas en el Campus Virtual. Cada trabajo se aprueba con la entrega en término y la defensa de la solución.</p>',
+    trabajosPracticos: [
+      { id: 'aed-tp-1', numero: '1', titulo: 'Algoritmos y pseudocódigo', proposito: 'Analizar problemas y representar su solución mediante pseudocódigo y diagramas de flujo.', modalidad: 'Individual', unidadTemas: 'Unidad 1' },
+      { id: 'aed-tp-2', numero: '2', titulo: 'Estructuras de control', proposito: 'Implementar y probar programas con estructuras condicionales y repetitivas.', modalidad: 'Individual y Grupal', unidadTemas: 'Unidad 2' },
+      { id: 'aed-tp-3', numero: '3', titulo: 'Funciones y procedimientos', proposito: 'Modularizar soluciones aplicando pasaje de parámetros y recursividad simple.', modalidad: 'Grupal', unidadTemas: 'Unidad 3' },
+      { id: 'aed-tp-4', numero: '4', titulo: 'Arreglos, cadenas y registros', proposito: 'Representar y procesar colecciones de datos con estructuras estáticas.', modalidad: 'Actividades en clases Prácticas y en plataforma', unidadTemas: 'Unidad 4' },
+      { id: 'aed-tp-5', numero: '5', titulo: 'Búsqueda y ordenamiento', proposito: 'Implementar y comparar algoritmos de búsqueda y ordenamiento midiendo su eficiencia.', modalidad: 'Grupal', unidadTemas: 'Unidad 5' },
+    ],
+    evalDescripcion:
+      '<p>La evaluación es <strong>continua</strong>: combina instancias formativas durante el cursado (cuestionarios, trabajos prácticos y laboratorio) con dos parciales sumativos, cada uno con su recuperatorio, y un coloquio integrador.</p>',
+    evaluacion: [
+      { id: 'aed-ev-1', tipo: 'Formativa', criterios: 'Resolución correcta de los ejercicios y uso adecuado de la notación algorítmica.', ra: 'RA1', tecnica: 'Cuestionarios en el Campus Virtual y pruebas de escritorio.' },
+      { id: 'aed-ev-2', tipo: 'Formativa', criterios: 'Funcionamiento, legibilidad y modularidad del código.', ra: 'RA2', tecnica: 'Rúbrica de trabajos prácticos de laboratorio.' },
+      { id: 'aed-ev-3', tipo: 'Sumativa', criterios: 'Selección y uso correcto de las estructuras de control y de datos.', ra: 'RA2, RA3', tecnica: '1er Parcial: examen escrito y práctico en máquina.' },
+      { id: 'aed-ev-4', tipo: 'Sumativa', criterios: 'Corrección y eficiencia de los algoritmos implementados.', ra: 'RA4', tecnica: '2do Parcial: examen práctico en máquina.' },
+      { id: 'aed-ev-5', tipo: 'Formativa / Sumativa', criterios: 'Trabajo en equipo y claridad de la comunicación técnica.', ra: 'RA5', tecnica: 'Coloquio integrador con rúbrica.' },
+    ],
+    regimen: {
+      promocionales:
+        '<ul><li>80 % de asistencia a las clases teóricas y prácticas.</li><li>100 % de los trabajos prácticos aprobados.</li><li>Ambos parciales aprobados con nota igual o mayor a 7 (siete), con un recuperatorio por parcial.</li><li>Aprobación del coloquio integrador.</li></ul>',
+      regulares:
+        '<ul><li>75 % de asistencia a las clases prácticas.</li><li>80 % de los trabajos prácticos aprobados.</li><li>Parciales aprobados con nota igual o mayor a 4 (cuatro); cada parcial tiene una instancia de recuperación.</li></ul><p>Rinden un examen final escrito u oral sobre los contenidos teóricos del programa.</p>',
+      libres:
+        '<p>Examen en dos instancias: una <strong>práctica eliminatoria en máquina</strong> sobre los contenidos de los trabajos prácticos y, una vez aprobada, una instancia <strong>teórica escrita u oral</strong> sobre la totalidad del programa.</p>',
+    },
+    bibliografia: {
+      basica: {
+        fisica: [
+          { id: 'aed-bf-1', titulo: 'Fundamentos de programación: algoritmos, estructura de datos y objetos', autores: 'Joyanes Aguilar, L.', editorial: 'McGraw-Hill', ejemplares: '5', anio: '2008' },
+          { id: 'aed-bf-2', titulo: 'Introduction to Algorithms', autores: 'Cormen, T.; Leiserson, C.; Rivest, R.; Stein, C.', editorial: 'MIT Press', ejemplares: '2', anio: '2009' },
+        ],
+        digital: [
+          { id: 'aed-bd-1', titulo: 'Metodología de la programación: algoritmos, diagramas de flujo y programas', autores: 'Cairó, O.', editorial: 'Alfaomega', url: ELIBRO, anio: '2005' },
+        ],
+      },
+      complementaria: {
+        fisica: [{ id: 'aed-bf-3', titulo: 'Algoritmos + Estructuras de Datos = Programas', autores: 'Wirth, N.', editorial: 'Ediciones del Castillo', ejemplares: '1', anio: '1980' }],
+        digital: [
+          { id: 'aed-bd-2', titulo: 'Programación en C: metodología, algoritmos y estructura de datos', autores: 'Joyanes Aguilar, L.; Zahonero Martínez, I.', editorial: 'McGraw-Hill', url: ELIBRO, anio: '2005' },
+        ],
+      },
+    },
+    horarios: {
+      ...horarioVacio(),
+      teoricas: { lunes: '18 a 21 hs', martes: '', miercoles: '', jueves: '', viernes: '', sabado: '' },
+      practicas: { lunes: '', martes: '', miercoles: 'Comisión 1: 9 a 12 hs', jueves: 'Comisión 2: 18 a 21 hs', viernes: '', sabado: '' },
+    },
+    cronograma: cronogramaAed,
+    notasCronograma:
+      'Las semanas 7 y 14 incluyen los exámenes parciales; los recuperatorios se toman en las semanas 11 y 15. El coloquio integrador se realiza en la semana 15.',
+  };
+
   docs.push(
+    // ISI · Ord. 231/2023 · PAAC completo en borrador (Prof. Campazzo, responsable).
+    paac({
+      id: 'paac-aed1', asignaturaId: 'asig-aed1', owner: 'u-campazzo', cycle: 2026, periodo: '1C', state: 'BORRADOR',
+      data: {}, paac: paacAed1,
+      pedReport: pendiente('ped'), discReport: pendiente('disc'),
+    }),
     // ISI · matricial: aprobada por UAP, pendiente de la Dirección.
     paac({
       id: 'paac-4', asignaturaId: 'asig-der', owner: 'u-sofia', cycle: 2026, periodo: '2C', state: 'APROBADO_PEDAGOGICO', pedApproved: true,
@@ -547,6 +505,11 @@ export function createInitialData() {
       discReport: informeFavorable('disc', 'María Vega', '08/05/2025', 'Cumple; se sugiere ampliar bibliografía complementaria.'),
     })
   );
+
+  // Los PAAC cargados con el esquema anterior (campos planos) pasan al modelo estructurado.
+  for (const d of docs) {
+    if (d.type === 'PAAC' && !d.paac) d.paac = paacDesdeDatosAnteriores(d.data ?? {});
+  }
 
   // ---- PAAD (Anexo III, Ord. 171/19) ----
   const catedraDeReferencia = (docenteId: string) => {
