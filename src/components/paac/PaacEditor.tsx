@@ -1,5 +1,10 @@
 import { createContext, useContext, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
+import { AvisoEstado, avisoDeDocumento } from '../shared/AvisoEstado';
+import { BadgeObservaciones, BarraPresentacion } from '../shared/EdicionDocumento';
+import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
+import { IconCheck, IconEye } from '../layout/icons';
+import { esReenvio } from '../../lib/revision';
 import { ObservationFieldWrapper } from '../shared/ObservationFieldWrapper';
 import { RichTextEditor } from '../shared/RichTextEditor';
 import { InfoTip } from '../paad/CamposPaad';
@@ -46,6 +51,8 @@ interface Props {
   canSubmit: boolean;
   canObserve: boolean;
   puedeIrAlInforme: boolean;
+  /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa). */
+  revision: InfoRevision | null;
   onBack: () => void;
   onOpenReport: () => void;
   onOpenPaadModal: (paadId: string) => void;
@@ -142,6 +149,7 @@ export function PaacEditor({
   canSubmit,
   canObserve,
   puedeIrAlInforme,
+  revision,
   onBack,
   onOpenReport,
   onOpenPaadModal,
@@ -183,15 +191,11 @@ export function PaacEditor({
     onSubmitDoc();
   };
 
-  const motivoLectura = !canEdit
-    ? ['BORRADOR', 'OBSERVADO'].includes(d.state)
-      ? role.startsWith('DOCENTE')
-        ? 'Modo lectura: solo el Docente Responsable de la cátedra edita y presenta el PAAC.'
-        : 'Vista de consulta para evaluación.'
-      : 'El PAAC ya fue presentado: se muestra en modo lectura.'
-    : null;
+  const pendientesTotales = d.comments.filter((o) => !o.resolved).length;
+  const aviso = avisoDeDocumento({ d, tipo: 'PAAC', canEdit, canObserve, esDocente: role.startsWith('DOCENTE'), pendientes: pendientesTotales });
 
   const obsPendientesSec = (sec: number) => d.comments.filter((o) => !o.resolved && o.section === sec).length;
+  const obsTotalesSec = (sec: number) => d.comments.filter((o) => o.section === sec).length;
   const mostrarErrores = intento && canEdit;
   const ctxCampos: ContextoCampos = {
     uid,
@@ -326,10 +330,10 @@ export function PaacEditor({
         </div>
       ) : (
         <CamposCtx.Provider value={ctxCampos}>
-          {motivoLectura && (
-            <div role="note" className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-xs text-muted">
-              <span aria-hidden>🔒</span> {motivoLectura}
-            </div>
+          {aviso && (
+            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo}>
+              {aviso.texto}
+            </AvisoEstado>
           )}
 
           {mostrarErrores && problemas.length > 0 && (
@@ -363,24 +367,22 @@ export function PaacEditor({
                     key={a.numero}
                     type="button"
                     onClick={() => ir(a.numero)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted transition-colors hover:bg-background hover:text-ink"
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-background hover:text-ink ${
+                      obs > 0 ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-muted'
+                    }`}
                   >
                     <span className="truncate">
                       {a.numero}) {a.corto}
                     </span>
                     <span className="flex shrink-0 items-center gap-1">
-                      {obs > 0 && (
-                        <span title={`${obs} observación(es)`} className="flex h-5 w-5 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">
-                          {obs}
-                        </span>
-                      )}
+                      <BadgeObservaciones pendientes={obs} total={obsTotalesSec(a.numero)} />
                       <span
                         aria-label={lleno ? 'Completo' : `${ok} de ${a.campos.length} campos`}
                         className={`min-w-[1.75rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums ${
                           lleno ? 'bg-soft text-primary' : conError ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-background text-muted'
                         }`}
                       >
-                        {lleno ? '✓' : `${ok}/${a.campos.length}`}
+                        {lleno ? <IconCheck className="mx-auto h-3 w-3" /> : `${ok}/${a.campos.length}`}
                       </span>
                     </span>
                   </button>
@@ -457,9 +459,9 @@ export function PaacEditor({
                                   <button
                                     type="button"
                                     onClick={() => onOpenPaadModal(it.paadId!)}
-                                    className="rounded-md border border-border bg-soft px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary hover:text-white"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-soft px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary hover:text-white"
                                   >
-                                    Ver PAAD ↗
+                                    <IconEye className="h-3.5 w-3.5" /> Ver PAAD
                                   </button>
                                 ) : (
                                   <span className="text-[11px] text-muted">Aún no presentado</span>
@@ -649,45 +651,25 @@ export function PaacEditor({
 
           {/* Barra de acciones */}
           {canEdit && (
+            <BarraPresentacion
+              tipo="PAAC"
+              sinGuardar={d.sinGuardar}
+              estadoGuardado={estadoGuardado}
+              problemas={problemas.length}
+              reenvio={esReenvio(d)}
+              canSubmit={canSubmit}
+              confirmar={confirmar}
+              onCancelar={() => setConfirmar(false)}
+              onPresentar={presentar}
+              onPreview={() => setVista('preview')}
+              onSaveDraft={onSaveDraft}
+            />
+          )}
+
+          {/* Decisión de UAP / Dirección */}
+          {revision && (
             <div className="no-print sticky bottom-4 z-30">
-              <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-xl sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-3 text-xs">
-                  <span className={`flex items-center gap-1.5 font-medium ${d.sinGuardar ? 'text-amber-700 dark:text-amber-400' : 'text-muted'}`} aria-live="polite">
-                    <span aria-hidden className={`h-2 w-2 rounded-full ${d.sinGuardar ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                    {estadoGuardado}
-                  </span>
-                  <span className={problemas.length ? 'text-muted' : 'font-medium text-emerald-700 dark:text-emerald-400'}>
-                    {problemas.length ? `${problemas.length} punto(s) pendiente(s) para presentar` : '✓ Listo para presentar'}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {confirmar ? (
-                    <>
-                      <span className="text-[11px] font-medium text-ink">Al presentar se bloquea la edición. ¿Confirmás?</span>
-                      <button type="button" onClick={() => setConfirmar(false)} className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Cancelar
-                      </button>
-                      <button type="button" onClick={presentar} autoFocus className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-hover">
-                        Sí, presentar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => setVista('preview')} className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Vista previa
-                      </button>
-                      <button type="button" onClick={onSaveDraft} className="rounded-lg border border-border bg-surface px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Guardar borrador
-                      </button>
-                      {canSubmit && (
-                        <button type="button" onClick={presentar} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-hover">
-                          {d.state === 'OBSERVADO' ? 'Subsanar y reenviar' : 'Presentar PAAC'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+              <PanelRevision revision={revision} tipo="PAAC" variante="barra" />
             </div>
           )}
         </CamposCtx.Provider>

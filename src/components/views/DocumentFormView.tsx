@@ -6,6 +6,7 @@ import { paadVacio, type PaadContenido } from '../../types/paad';
 import type { PaacContenido } from '../../types/paac';
 import type { AsigContext, DocumentoResumen, EquipoCatedra, Usuario } from '../../types/estructura';
 import type { DocumentoEditable } from '../../types/planificacion';
+import type { InfoRevision } from '../shared/PanelRevision';
 
 interface DocumentFormViewProps {
   d: DocumentoEditable;
@@ -29,6 +30,8 @@ interface DocumentFormViewProps {
   onResolveObs: (obsId: string) => void;
   onOpenReport: (id: string) => void;
   onOpenPaadModal: (paadId: string) => void;
+  /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa este documento). */
+  revision: InfoRevision | null;
 }
 
 /** Abre el editor del documento según su tipo: PAAD (Anexo III) o PAAC. */
@@ -52,6 +55,7 @@ export function DocumentFormView({
   onResolveObs,
   onOpenReport,
   onOpenPaadModal,
+  revision,
 }: DocumentFormViewProps) {
   if (d.type === 'PAAD') {
     const misEquipos = S.equiposCatedra.filter((e) => e.docenteId === d.owner && e.cicloLectivo === d.cycle);
@@ -72,6 +76,7 @@ export function DocumentFormView({
         canObserve={canObserve}
         aspectos={armarAspectosGenerales({ contenido, ownerId: d.owner, ciclo: d.cycle, usuarios: S.usuarios, equipos: S.equiposCatedra, asigContext })}
         catedras={catedras}
+        revision={revision}
         onBack={onBack}
         onUpdatePaad={onUpdatePaad}
         onSaveDraft={onSaveDraft}
@@ -116,6 +121,7 @@ export function DocumentFormView({
       canSubmit={canSubmit}
       canObserve={canObserve}
       puedeIrAlInforme={['UAP', 'DIRECCION_CARRERA'].includes(role)}
+      revision={revision}
       onBack={onBack}
       onOpenReport={() => onOpenReport(d.id)}
       onOpenPaadModal={onOpenPaadModal}

@@ -474,7 +474,9 @@ export function createInitialData() {
       data: { intro: 'Primer contacto con herramientas profesionales de desarrollo.', method: 'Laboratorio semanal con entregas cortas.', eval: 'Entregas prácticas y un proyecto final.', units: [['Unidad 1: Git', 'Repositorios, ramas y fusiones.']], tp: [['1', 'Repositorio personal en Git', 'Individual', 'Laboratorio', '4', 'Semana 3']] },
       pedReport: pendiente('ped'),
       discReport: { items: { 0: 'Cumple parcialmente: falta la unidad de pruebas.', 1: 'Cumple', 2: 'Bibliografía desactualizada.' }, dictamen: 'OBSERVADO', obsDisciplinares: 'Incorporar los contenidos mínimos de pruebas básicas y actualizar la bibliografía.', by: 'Laura Pérez', fecha: '15/04/2026' },
-      comments: [{ id: 'obs-cham-1', resolved: false }],
+      comments: [
+        { id: 'obs-cham-1', field: 'unidades', campoPath: 'paac.unidades', section: 5, area: 'direccion', author: 'Laura Pérez (Dirección TUI)', text: 'Falta una unidad con los contenidos mínimos de pruebas básicas de software.', date: '15/04/2026', resolved: false },
+      ],
     }),
     // ISI · instanciada por el lote de 2C pero todavía sin iniciar (data vacía).
     paac({
@@ -598,16 +600,31 @@ export function createInitialData() {
   const estadoPaad: Record<string, { state: string; ok: boolean }> = {
     'u-lucia': { state: 'ENVIADO_A_REVISION', ok: false },
     'u-sofia': { state: 'APROBADO', ok: true },
+    // Devuelto por la UAP: el docente puede corregirlo y volver a presentarlo.
+    'u-martin': { state: 'OBSERVADO', ok: false },
   };
+  const informePaad = (ok: boolean) => ({ items: {}, dictamen: ok ? 'APROBADO' : 'PENDIENTE' });
   const docentesList = usuarios.filter((u) => u.rol === 'Docente');
-  const paads = docentesList.map((u) => ({
-    id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
-    state: estadoPaad[u.id]?.state ?? 'BORRADOR',
-    pedApproved: estadoPaad[u.id]?.ok ?? false, discApproved: estadoPaad[u.id]?.ok ?? false,
-    data: {},
-    paad: u.id === 'u-lastra' ? paadLastra : paadGenerico(u.id),
-    comments: [],
-  }));
+  const paads = docentesList.map((u) => {
+    const ok = estadoPaad[u.id]?.ok ?? false;
+    const observadoUap = u.id === 'u-martin';
+    return {
+      id: 'paad-' + u.id, type: 'PAAD', owner: u.id, cycle: 2026, evalCareer: 'car-isi',
+      state: estadoPaad[u.id]?.state ?? 'BORRADOR',
+      pedApproved: ok, discApproved: ok,
+      pedReport: observadoUap
+        ? { items: {}, dictamen: 'OBSERVADO', obsGenerales: 'Detallar las capacitaciones previstas en el apartado 1) a).', by: 'Ana Suárez', fecha: '05/05/2026' }
+        : informePaad(ok),
+      discReport: informePaad(ok),
+      data: {},
+      paad: u.id === 'u-lastra' ? paadLastra : paadGenerico(u.id),
+      comments: observadoUap
+        ? [
+            { id: 'obs-paad-martin-1', field: 'ensenanza.a', campoPath: 'paad.ensenanza.a', section: 1, area: 'uap', author: 'Ana Suárez (UAP)', text: 'Indicar lugar, fecha y área de conocimiento de las capacitaciones en las que participará.', date: '05/05/2026', resolved: false },
+          ]
+        : [],
+    };
+  });
 
   return { cycle: 2026, sedes, departamentos, carreras, planes, asignaturas, usuarios, equiposCatedra, periodos, docs: [...docs, ...paads] };
 }

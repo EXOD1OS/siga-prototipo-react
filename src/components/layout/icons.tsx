@@ -8,7 +8,7 @@ function Base({ children, className = 'h-[18px] w-[18px]', ...props }: IconProps
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.7}
+      strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
@@ -143,6 +143,33 @@ export const IconKey = (p: IconProps) => (
 export const IconLogout = (p: IconProps) => (
   <Base {...p}>
     <path d="M14 4.5H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h8M10 12h10M17 8.5l3.5 3.5-3.5 3.5" />
+  </Base>
+);
+
+export const IconLock = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="5" y="10.5" width="14" height="10" rx="2" />
+    <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2" />
+  </Base>
+);
+
+export const IconSend = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M20.5 3.5 10 14M20.5 3.5 14 20.5l-4-6.5-6.5-4z" />
+  </Base>
+);
+
+export const IconReturn = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M9 14.5 4.5 10 9 5.5" />
+    <path d="M4.5 10H15a4.5 4.5 0 0 1 0 9h-3" />
+  </Base>
+);
+
+export const IconEye = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="2.8" />
   </Base>
 );
 

@@ -1,6 +1,7 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Modal, ModalButton } from '../shared/Modal';
 import { StatusBadge } from '../shared/StatusBadge';
+import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
 import { DISCITEMS, PEDITEMS } from '../../data/mockData';
 import type { AsigContext } from '../../types/estructura';
 import {
@@ -17,6 +18,8 @@ export interface AccionesInforme {
   onEvaluar: (() => void) | null;
   onElevar: (() => void) | null;
   onFormalizar: (() => void) | null;
+  /** Cierre de revisión de la UAP o la Dirección. */
+  revision: InfoRevision | null;
 }
 
 interface InformesModalProps {
@@ -179,6 +182,12 @@ export function InformesModal({ doc, ctx, responsable, acciones, onClose }: Info
         </>
       }
     >
+      {acciones.revision && (
+        <div className="mb-4">
+          <PanelRevision revision={acciones.revision} tipo="PAAC" />
+        </div>
+      )}
+
       <div role="tablist" aria-label="Informes de la planificación" className="-mt-1 mb-4 flex gap-1 overflow-x-auto border-b border-border">
         {tabs.map((t) => {
           const activo = tab === t.key;

@@ -14,11 +14,11 @@ export type EstadoPlanif =
 
 export const ESTADO_LABELS: Record<EstadoPlanif, string> = {
   BORRADOR: 'Borrador',
-  ENVIADO_A_REVISION: 'En revisión',
+  ENVIADO_A_REVISION: 'Presentado · En revisión',
   OBSERVADO: 'Observado',
   APROBADO_PEDAGOGICO: 'Aprob. pedagógico',
   APROBADO_DISCIPLINAR: 'Aprob. disciplinar',
-  APROBADO_PLENO: 'Aprobado pleno',
+  APROBADO_PLENO: 'Evaluado favorablemente',
   ELEVADO_AL_CONSEJO: 'Elevado al Consejo',
   FINALIZADO: 'Finalizado',
 };
@@ -36,9 +36,9 @@ export const ESTADOS_ACTIVOS: EstadoPlanif[] = [
 export const ESTADOS_HISTORICOS: EstadoPlanif[] = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
 
 /** Valor guardado del dictamen en el informe. */
-export type DictamenGuardado = 'PENDIENTE' | 'APROBADO' | 'OBSERVADO';
+export type DictamenGuardado = 'PENDIENTE' | 'APROBADO' | 'OBSERVADO' | 'REEVALUACION';
 /** Dictamen tal como se muestra en la bandeja. */
-export type Dictamen = 'PENDIENTE' | 'FAVORABLE' | 'CON_OBSERVACIONES';
+export type Dictamen = 'PENDIENTE' | 'FAVORABLE' | 'CON_OBSERVACIONES' | 'REEVALUACION';
 
 export interface InformeEvaluacion {
   /** Valoración por ítem (índice de PEDITEMS / DISCITEMS). */
@@ -108,6 +108,9 @@ export interface DocumentoEditable {
   /** Contenido estructurado del PAAC (solo documentos PAAC). */
   paac?: PaacContenido;
   comments: ObservacionDoc[];
+  /** Dictámenes de UAP (pedagógico) y Dirección (disciplinar). */
+  pedReport?: InformeEvaluacion;
+  discReport?: InformeEvaluacion;
   sinGuardar?: boolean;
   guardadoEn?: string;
 }
@@ -144,6 +147,7 @@ export const ETAPA_PAAC: Record<EtapaPaac, { label: string; cls: string }> = {
 export function dictamenDe(aprobado: boolean, informe: InformeEvaluacion | undefined): Dictamen {
   if (aprobado || informe?.dictamen === 'APROBADO') return 'FAVORABLE';
   if (informe?.dictamen === 'OBSERVADO') return 'CON_OBSERVACIONES';
+  if (informe?.dictamen === 'REEVALUACION') return 'REEVALUACION';
   return 'PENDIENTE';
 }
 
@@ -151,10 +155,12 @@ export const DICTAMEN_LABELS: Record<Dictamen, string> = {
   PENDIENTE: 'Pendiente',
   FAVORABLE: 'Favorable',
   CON_OBSERVACIONES: 'Con observaciones',
+  REEVALUACION: 'Pendiente de re-evaluación',
 };
 
 export const DICTAMEN_BADGE: Record<Dictamen, string> = {
   PENDIENTE: 'bg-slate-500/15 text-muted',
   FAVORABLE: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   CON_OBSERVACIONES: 'bg-red-500/15 text-red-700 dark:text-red-400',
+  REEVALUACION: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
 };

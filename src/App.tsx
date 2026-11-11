@@ -12,6 +12,17 @@ import { DocumentFormView } from './components/views/DocumentFormView';
 import { ReportEvaluationView } from './components/views/ReportEvaluationView';
 import { AdminEstructuraView } from './components/views/AdminEstructuraView';
 import { AdminUsuariosView } from './components/views/AdminUsuariosView';
+import type { InfoRevision } from './components/shared/PanelRevision';
+import {
+  areaDeRol,
+  esEditablePorDocente,
+  esReenvio,
+  ESTADOS_EN_REVISION,
+  finalizarRevision,
+  observacionesPendientesDe,
+  presentarDocumento,
+  type ResultadoRevision,
+} from './lib/revision';
 
 export default function App() {
   const [S, setS] = useState(() => createInitialData());
@@ -131,7 +142,8 @@ export default function App() {
   };
 
   const canEditDoc = (d: any) => {
-    if (!d || !['BORRADOR', 'OBSERVADO'].includes(d.state)) return false;
+    // Borrador, Observado o con algún dictamen "Con observaciones": el docente puede corregir.
+    if (!d || !esEditablePorDocente(d)) return false;
     if (!role.startsWith('DOCENTE')) return false;
     if (d.type === 'PAAD') return d.owner === uid;
     // El PAAC lo confecciona y edita el Docente Responsable; el resto del equipo lo ve en lectura.
@@ -147,7 +159,7 @@ export default function App() {
   };
 
   const canObserveDoc = (d: any) => {
-    if (!d || !['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(d.state)) return false;
+    if (!d || !ESTADOS_EN_REVISION.includes(d.state)) return false;
     if (role === 'UAP') return !d.pedApproved;
     if (role === 'DIRECCION_CARRERA') {
       const cid = d.type === 'PAAC' ? asigContext(d.asignaturaId).carrera?.id : d.evalCareer;
@@ -161,6 +173,38 @@ export default function App() {
       ...prev,
       docs: prev.docs.map((doc) => (doc.id === activeDocId ? updater(JSON.parse(JSON.stringify(doc))) : doc)),
     }));
+  };
+
+  /** UAP / Dirección cierran su revisión: devuelven al docente o emiten dictamen favorable. */
+  const finalizarRevisionDoc = (docId: string, resultado: ResultadoRevision) => {
+    const area = areaDeRol(role);
+    const doc = docBy(docId);
+    if (!area || !doc) return;
+    const { doc: next, error } = finalizarRevision(doc, area, resultado, {
+      autor: activeUserName,
+      fecha: new Date().toLocaleDateString('es-AR'),
+    });
+    if (error) {
+      showToast(error, 'warning');
+      return;
+    }
+    setS((prev) => ({ ...prev, docs: prev.docs.map((x) => (x.id === docId ? next : x)) }));
+    const quien = area === 'uap' ? 'pedagógico (UAP)' : 'disciplinar (Dirección)';
+    showToast(
+      resultado === 'OBSERVADO'
+        ? `${doc.type} devuelto al docente con observaciones: ya puede corregirlo.`
+        : ['APROBADO_PLENO', 'APROBADO'].includes(next.state)
+          ? `Dictamen ${quien} favorable. Ambos dictámenes son favorables: ${doc.type} evaluado favorablemente.`
+          : `Dictamen ${quien} favorable registrado.`,
+      resultado === 'OBSERVADO' ? 'warning' : 'success'
+    );
+  };
+
+  /** Datos del panel de decisión si la sesión puede revisar el documento. */
+  const revisionPara = (d: any): InfoRevision | null => {
+    const area = areaDeRol(role);
+    if (!d || !area || !canObserveDoc(d)) return null;
+    return { area, pendientes: observacionesPendientesDe(d, area), onFinalizar: (r) => finalizarRevisionDoc(d.id, r) };
   };
 
   const paacs = S.docs.filter((d) => d.type === 'PAAC');
@@ -272,6 +316,7 @@ export default function App() {
                 setActiveDocId(id);
                 setPage('doc');
               }}
+              onFinalizarRevision={finalizarRevisionDoc}
             />
           )}
 
@@ -291,24 +336,8 @@ export default function App() {
                 setActiveDocId(paadId);
                 setPage('doc');
               }}
-              onApproveUap={(paadId) => {
-                setS((prev) => ({
-                  ...prev,
-                  docs: prev.docs.map((x) =>
-                    x.id === paadId ? { ...x, pedApproved: true, state: x.discApproved ? 'APROBADO' : x.state } : x
-                  ),
-                }));
-                showToast('Conformidad UAP registrada en el PAAD.');
-              }}
-              onApproveDir={(paadId) => {
-                setS((prev) => ({
-                  ...prev,
-                  docs: prev.docs.map((x) =>
-                    x.id === paadId ? { ...x, discApproved: true, state: x.pedApproved ? 'APROBADO' : x.state } : x
-                  ),
-                }));
-                showToast('Conformidad de Dirección registrada en el PAAD.');
-              }}
+              onApproveUap={(paadId) => finalizarRevisionDoc(paadId, 'FAVORABLE')}
+              onApproveDir={(paadId) => finalizarRevisionDoc(paadId, 'FAVORABLE')}
               onChangeEvalCareer={(paadId, newCarId) => {
                 setS((prev) => ({
                   ...prev,
@@ -356,14 +385,20 @@ export default function App() {
                 showToast('Borrador guardado. El estado del documento no cambió.');
               }}
               onSubmitDoc={() => {
-                updateActiveDoc((doc) => {
-                  doc.state = 'ENVIADO_A_REVISION';
-                  doc.sinGuardar = false;
-                  doc.guardadoEn = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-                  return doc;
-                });
-                showToast(`${currentDoc.type} presentado: enviado a revisión de UAP y Dirección.`);
+                const reenvio = esReenvio(currentDoc);
+                updateActiveDoc((doc) => ({
+                  // Guarda las correcciones y vuelve a revisión; los dictámenes observados quedan "Pendiente de re-evaluación".
+                  ...presentarDocumento(doc),
+                  sinGuardar: false,
+                  guardadoEn: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+                }));
+                showToast(
+                  reenvio
+                    ? `${currentDoc.type} subsanado y presentado nuevamente: queda pendiente de re-evaluación.`
+                    : `${currentDoc.type} presentado: enviado a revisión de UAP y Dirección.`
+                );
               }}
+              revision={revisionPara(currentDoc)}
               onAddObs={(fKey: string, path: string, txt: string, secIdx: number) =>
                 updateActiveDoc((doc) => {
                   doc.comments.push({
@@ -398,8 +433,15 @@ export default function App() {
           {page === 'report' && currentDoc && (
             <ReportEvaluationView
               d={currentDoc}
-              role={role}
               asigContext={asigContext}
+              revision={revisionPara(currentDoc)}
+              onUpdateObs={(area, texto) =>
+                updateActiveDoc((doc) => {
+                  if (area === 'uap') doc.pedReport.obsGenerales = texto;
+                  else doc.discReport.obsDisciplinares = texto;
+                  return doc;
+                })
+              }
               onBackToDoc={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
@@ -413,31 +455,6 @@ export default function App() {
               onUpdateDiscItem={(idx: number, val: string) =>
                 updateActiveDoc((doc) => {
                   doc.discReport.items[idx] = val;
-                  return doc;
-                })
-              }
-              onEmitObserved={() =>
-                updateActiveDoc((doc) => {
-                  doc.state = 'OBSERVADO';
-                  // Registra qué área observó, para la columna Dictámenes de la bandeja.
-                  const informe = role === 'UAP' ? 'pedReport' : 'discReport';
-                  doc[informe] = { ...doc[informe], dictamen: 'OBSERVADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
-                  return doc;
-                })
-              }
-              onEmitApprovedUap={() =>
-                updateActiveDoc((doc) => {
-                  doc.pedApproved = true;
-                  doc.pedReport = { ...doc.pedReport, dictamen: 'APROBADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
-                  doc.state = doc.discApproved ? 'APROBADO_PLENO' : 'APROBADO_PEDAGOGICO';
-                  return doc;
-                })
-              }
-              onEmitApprovedDir={() =>
-                updateActiveDoc((doc) => {
-                  doc.discApproved = true;
-                  doc.discReport = { ...doc.discReport, dictamen: 'APROBADO', by: activeUserName, fecha: new Date().toLocaleDateString('es-AR') };
-                  doc.state = doc.pedApproved ? 'APROBADO_PLENO' : 'APROBADO_DISCIPLINAR';
                   return doc;
                 })
               }
@@ -612,6 +629,16 @@ export default function App() {
           })}
           docenteName={fullName(modalPaad.owner)}
           carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.sigla || ''}`}
+          revision={revisionPara(modalPaad)}
+          onAbrirDetalle={
+            canObserveDoc(modalPaad)
+              ? () => {
+                  setActiveDocId(modalPaad.id);
+                  setModalPaadId(null);
+                  setPage('doc');
+                }
+              : undefined
+          }
           onClose={() => setModalPaadId(null)}
         />
       )}

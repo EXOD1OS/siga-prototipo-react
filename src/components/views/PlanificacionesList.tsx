@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
 import { ROLES_DEPARTAMENTALES, esSesionDocente, puedeVerPlanificacion } from '../../lib/visibilidad';
+import { areaDeRol, ESTADOS_EN_REVISION, observacionesPendientesDe, type ResultadoRevision } from '../../lib/revision';
+import { IconAlert } from '../layout/icons';
 import type { AsigContext, Carrera, EquipoCatedra } from '../../types/estructura';
 import {
   DICTAMEN_BADGE,
@@ -37,12 +39,13 @@ interface PlanificacionesListProps {
   onElevarPaac: (id: string) => void;
   onOpenFormalizarModal: (id: string) => void;
   onViewFinal: (id: string) => void;
+  /** Cierra la revisión de la sesión (UAP o Dirección) sobre un PAAC. */
+  onFinalizarRevision: (id: string, resultado: ResultadoRevision) => void;
 }
 
 type Vista = 'activas' | 'historicas';
 const TODOS = 'ALL';
 const POR_PAGINA = 10;
-const ESTADOS_EN_REVISION: EstadoPlanif[] = ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'];
 
 const controlCls =
   'w-full rounded-lg bg-surface border border-border px-3 py-2 text-xs text-ink outline-none transition focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed';
@@ -133,6 +136,7 @@ export function PlanificacionesList({
   onElevarPaac,
   onOpenFormalizarModal,
   onViewFinal,
+  onFinalizarRevision,
 }: PlanificacionesListProps) {
   const esDireccion = role === 'DIRECCION_CARRERA';
   const [vista, setVista] = useState<Vista>('activas');
@@ -224,7 +228,12 @@ export function PlanificacionesList({
       setInformesId(null);
       fn(d.id);
     };
+    const area = areaDeRol(role);
     return {
+      revision:
+        puedeEvaluar && area
+          ? { area, pendientes: observacionesPendientesDe(d, area), onFinalizar: (r) => onFinalizarRevision(d.id, r) }
+          : null,
       onEvaluar: puedeEvaluar ? cerrarY(onOpenReport) : null,
       onElevar: esDireccion && d.state === 'APROBADO_PLENO' ? cerrarY(onElevarPaac) : null,
       onFormalizar:
@@ -406,7 +415,11 @@ export function PlanificacionesList({
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge state={d.state} />
-                        {obs > 0 && <span className="text-[10px] font-semibold text-danger">{obs} obs. activa(s)</span>}
+                        {obs > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                            <IconAlert className="h-3 w-3" /> {obs} obs. pendiente(s)
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3">

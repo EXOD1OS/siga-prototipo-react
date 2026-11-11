@@ -99,7 +99,7 @@ export function PaadsListView({
           >
             <option value="ALL">Todos los estados de PAAD</option>
             <option value="BORRADOR">Borrador</option>
-            <option value="ENVIADO_A_REVISION">Enviado a Revisión</option>
+            <option value="ENVIADO_A_REVISION">Presentado · En revisión</option>
             <option value="OBSERVADO">Observado</option>
             <option value="APROBADO">PAAD Aprobado</option>
           </select>
@@ -170,12 +170,12 @@ export function PaadsListView({
                       <td className="p-4 space-y-1">
                         <div>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${d.pedApproved ? 'bg-emerald-500/15 text-emerald-600' : 'bg-background text-muted'}`}>
-                            UAP: {d.pedApproved ? '✓ Conformidad' : 'Pendiente'}
+                            UAP: {d.pedApproved ? 'Conformidad' : d.pedReport?.dictamen === 'OBSERVADO' ? 'Con observaciones' : 'Pendiente'}
                           </span>
                         </div>
                         <div>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${d.discApproved ? 'bg-emerald-500/15 text-emerald-600' : 'bg-background text-muted'}`}>
-                            Dir: {d.discApproved ? '✓ Conformidad' : 'Pendiente'}
+                            Dir: {d.discApproved ? 'Conformidad' : d.discReport?.dictamen === 'OBSERVADO' ? 'Con observaciones' : 'Pendiente'}
                           </span>
                         </div>
                       </td>
@@ -193,7 +193,7 @@ export function PaadsListView({
                           >
                             Observar / Detalle
                           </button>
-                          {role === 'UAP' && !d.pedApproved && d.state !== 'BORRADOR' && (
+                          {role === 'UAP' && !d.pedApproved && d.state === 'ENVIADO_A_REVISION' && (
                             <button
                               onClick={() => onApproveUap(d.id)}
                               className="px-2.5 py-1.5 rounded-lg bg-primary text-white font-semibold"
@@ -201,7 +201,7 @@ export function PaadsListView({
                               Aprobar UAP
                             </button>
                           )}
-                          {role === 'DIRECCION_CARRERA' && d.evalCareer === careerId && !d.discApproved && d.state !== 'BORRADOR' && (
+                          {role === 'DIRECCION_CARRERA' && d.evalCareer === careerId && !d.discApproved && d.state === 'ENVIADO_A_REVISION' && (
                             <button
                               onClick={() => onApproveDir(d.id)}
                               className="px-2.5 py-1.5 rounded-lg bg-primary text-white font-semibold"

@@ -1,5 +1,9 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
+import { AvisoEstado, avisoDeDocumento } from '../shared/AvisoEstado';
+import { BadgeObservaciones, BarraPresentacion } from '../shared/EdicionDocumento';
+import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
+import { esReenvio } from '../../lib/revision';
 import { ObservationFieldWrapper } from '../shared/ObservationFieldWrapper';
 import { FichaAspectos, InfoTip, ListaItems, MatrizHorasPaad } from './CamposPaad';
 import { BotonImprimir, PaadDocumentoOficial } from './PaadDocumentoOficial';
@@ -17,6 +21,8 @@ interface PaadEditorProps {
   aspectos: AspectosGeneralesPaad;
   /** Cátedras del docente en el ciclo, para elegir la de referencia. */
   catedras: { id: string; label: string }[];
+  /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa). */
+  revision: InfoRevision | null;
   onBack: () => void;
   onUpdatePaad: (c: PaadContenido) => void;
   onSaveDraft: () => void;
@@ -38,6 +44,7 @@ export function PaadEditor({
   canObserve,
   aspectos,
   catedras,
+  revision,
   onBack,
   onUpdatePaad,
   onSaveDraft,
@@ -74,14 +81,18 @@ export function PaadEditor({
     onSubmitDoc();
   };
 
-  const motivoLectura = !canEdit
-    ? ['BORRADOR', 'OBSERVADO'].includes(d.state)
-      ? 'Vista de consulta para evaluación: solo el docente titular del PAAD puede editarlo.'
-      : 'El PAAD ya fue presentado: se muestra en modo lectura.'
-    : null;
+  const aviso = avisoDeDocumento({
+    d,
+    tipo: 'PAAD',
+    canEdit,
+    canObserve,
+    esDocente: role.startsWith('DOCENTE'),
+    pendientes: d.comments.filter((o) => !o.resolved).length,
+  });
 
   const obsDe = (key: string) => d.comments.filter((o) => o.field === key);
   const obsPendientesSec = (sec: number) => d.comments.filter((o) => !o.resolved && o.section === sec).length;
+  const obsTotalesSec = (sec: number) => d.comments.filter((o) => o.section === sec).length;
 
   const indice = [
     { id: 'aspectos', label: 'Aspectos generales', n: null as number | null, sec: 0 },
@@ -164,10 +175,10 @@ export function PaadEditor({
         </div>
       ) : (
         <>
-          {motivoLectura && (
-            <div role="note" className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-xs text-muted">
-              <span aria-hidden>🔒</span> {motivoLectura}
-            </div>
+          {aviso && (
+            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo}>
+              {aviso.texto}
+            </AvisoEstado>
           )}
 
           {intento && problemas.length > 0 && (
@@ -192,11 +203,13 @@ export function PaadEditor({
                     key={it.id}
                     type="button"
                     onClick={() => ir(it.id)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-muted transition-colors hover:bg-background hover:text-ink"
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-background hover:text-ink ${
+                      obs > 0 ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-muted'
+                    }`}
                   >
                     <span className="truncate">{it.label}</span>
                     <span className="flex shrink-0 items-center gap-1">
-                      {obs > 0 && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">{obs}</span>}
+                      <BadgeObservaciones pendientes={obs} total={obsTotalesSec(it.sec)} />
                       {it.n !== null && (
                         <span
                           className={`min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums ${
@@ -337,45 +350,25 @@ export function PaadEditor({
 
           {/* Barra de acciones */}
           {canEdit && (
+            <BarraPresentacion
+              tipo="PAAD"
+              sinGuardar={d.sinGuardar}
+              estadoGuardado={estadoGuardado}
+              problemas={problemas.length}
+              reenvio={esReenvio(d)}
+              canSubmit={canSubmit}
+              confirmar={confirmar}
+              onCancelar={() => setConfirmar(false)}
+              onPresentar={presentar}
+              onPreview={() => setVista('preview')}
+              onSaveDraft={onSaveDraft}
+            />
+          )}
+
+          {/* Decisión de UAP / Dirección */}
+          {revision && (
             <div className="no-print sticky bottom-4 z-30">
-              <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-xl sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-3 text-xs">
-                  <span className={`flex items-center gap-1.5 font-medium ${d.sinGuardar ? 'text-amber-700 dark:text-amber-400' : 'text-muted'}`} aria-live="polite">
-                    <span aria-hidden className={`h-2 w-2 rounded-full ${d.sinGuardar ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                    {estadoGuardado}
-                  </span>
-                  <span className={problemas.length ? 'text-muted' : 'font-medium text-emerald-700 dark:text-emerald-400'}>
-                    {problemas.length ? `${problemas.length} punto(s) pendiente(s)` : '✓ Listo para presentar'}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {confirmar ? (
-                    <>
-                      <span className="text-[11px] font-medium text-ink">Al presentar se bloquea la edición. ¿Confirmás?</span>
-                      <button type="button" onClick={() => setConfirmar(false)} className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Cancelar
-                      </button>
-                      <button type="button" onClick={presentar} autoFocus className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-hover">
-                        Sí, presentar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => setVista('preview')} className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Vista previa
-                      </button>
-                      <button type="button" onClick={onSaveDraft} className="rounded-lg border border-border bg-surface px-3.5 py-2 text-xs font-medium text-ink hover:bg-background">
-                        Guardar borrador
-                      </button>
-                      {canSubmit && (
-                        <button type="button" onClick={presentar} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-hover">
-                          {d.state === 'OBSERVADO' ? 'Subsanar y reenviar' : 'Presentar PAAD'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+              <PanelRevision revision={revision} tipo="PAAD" variante="barra" />
             </div>
           )}
         </>
