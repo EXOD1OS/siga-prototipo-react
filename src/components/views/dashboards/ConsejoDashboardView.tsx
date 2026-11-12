@@ -1,9 +1,22 @@
-import { useState } from 'react';
-import { StatusBadge } from '../../shared/StatusBadge';
+import { useState, type ReactNode } from 'react';
 import { IconCheck, IconClock, IconDocs, IconSeal } from '../../layout/icons';
-import { BarraAvance, BarraSegmentos, KpiCard, Panel, SaludoDashboard, pct } from './DashboardKit';
-import { ESTADOS_FAVORABLES, contar, paacsDe, type DatosDashboard, type NavDashboard } from './datos';
+import {
+  BarraProgreso,
+  COLOR,
+  CareerComparisonMatrix,
+  DonutChartCard,
+  KpiFilterCard,
+  MetricaBarra,
+  Panel,
+  Pastillas,
+  SaludoDashboard,
+  SelectableCatedraCard,
+  linkCls,
+  pct,
+} from './DashboardKit';
+import { ESTADOS_FAVORABLES, contar, ordenanzaDe, paacsDe, tarjetaDe, type DatosDashboard, type NavDashboard } from './datos';
 import type { FiltrosPaac } from '../../../types/navegacion';
+import type { PaacDoc } from '../../../types/planificacion';
 
 interface Props {
   datos: DatosDashboard;
@@ -12,217 +25,208 @@ interface Props {
   onFormalizar: (id: string) => void;
 }
 
-const REGIMEN: Record<string, string> = { '1C': '1C', '2C': '2C', ANUAL: 'Anual' };
+type FiltroConsejo = 'pendientes' | 'finalizadas' | 'favorables';
+const PENDIENTES = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'];
 
 /**
  * Inicio del Consejo Departamental: cátedras evaluadas favorablemente, elevadas y protocolizadas.
  * Puede verse sobre el ciclo vigente o sobre todos los ciclos (las finalizadas suelen ser de ciclos anteriores).
  */
 export function ConsejoDashboardView({ datos, nav, onFormalizar }: Props) {
-  const { nombre, ciclo, carreras, asigContext, fullName } = datos;
+  const { nombre, ciclo, asigContext } = datos;
   const [alcance, setAlcance] = useState<'ciclo' | 'todos'>('ciclo');
+  const [filtro, setFiltro] = useState<FiltroConsejo>('pendientes');
   const paacs = alcance === 'ciclo' ? datos.paacs.filter((d) => d.cycle === ciclo) : datos.paacs;
   const f: FiltrosPaac = alcance === 'ciclo' ? { ciclo } : {};
-
   const total = paacs.length;
-  const pendientesSesion = paacs.filter((d) => ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'].includes(d.state) && !d.expediente);
-  const finalizadas = contar(paacs, (d) => d.state === 'FINALIZADO');
+
+  const finalizadas = paacs.filter((d) => d.state === 'FINALIZADO');
+  const elevadas = paacs.filter((d) => d.state === 'ELEVADO_AL_CONSEJO');
+  const plenas = paacs.filter((d) => d.state === 'APROBADO_PLENO');
   const favorables = paacs.filter((d) => ESTADOS_FAVORABLES.includes(d.state));
   const previas = total - favorables.length;
+  const grupos: Record<FiltroConsejo, PaacDoc[]> = {
+    pendientes: paacs.filter((d) => PENDIENTES.includes(d.state)),
+    finalizadas,
+    favorables,
+  };
+  const lista = [...grupos[filtro]].sort((a, b) => ESTADOS_FAVORABLES.indexOf(a.state) - ESTADOS_FAVORABLES.indexOf(b.state) || b.cycle - a.cycle);
 
-  const listado = [...favorables].sort(
-    (a, b) => ESTADOS_FAVORABLES.indexOf(a.state) - ESTADOS_FAVORABLES.indexOf(b.state) || b.cycle - a.cycle
-  );
+  const kpis: { key: FiltroConsejo | 'previas'; titulo: string; valor: number; detalle: string; color: string; icono: ReactNode; ir: () => void }[] = [
+    { key: 'pendientes', titulo: 'Pendientes de protocolizar', valor: grupos.pendientes.length, detalle: 'Elevados y con aprobación plena', color: COLOR.elevado, icono: <IconClock className="h-4 w-4" />, ir: () => nav.goToPlanificaciones({ ...f, state: 'ELEVADO_AL_CONSEJO' }) },
+    { key: 'finalizadas', titulo: 'Finalizadas con Resolución', valor: finalizadas.length, detalle: `${pct(finalizadas.length, total)}% del padrón`, color: COLOR.aprobado, icono: <IconSeal className="h-4 w-4" />, ir: () => nav.goToPlanificaciones({ ...f, state: 'FINALIZADO' }) },
+    { key: 'favorables', titulo: 'Total evaluadas favorablemente', valor: favorables.length, detalle: `${pct(favorables.length, total)}% del padrón`, color: COLOR.pleno, icono: <IconCheck className="h-4 w-4" />, ir: () => nav.goToPlanificaciones({ ...f, vista: 'historicas' }) },
+    { key: 'previas', titulo: 'En circuito previo', valor: previas, detalle: 'Borrador, revisión u observadas', color: COLOR.pendiente, icono: <IconDocs className="h-4 w-4" />, ir: () => nav.goToPlanificaciones({ ...f, vista: 'activas' }) },
+  ];
+
+  const informes = [
+    { key: 'uap', label: 'Informe Pedagógico UAP (Anexo III)', valor: contar(paacs, (d) => d.pedApproved) },
+    { key: 'dir', label: 'Informe Disciplinar Dirección (Anexo IV)', valor: contar(paacs, (d) => d.discApproved) },
+  ];
 
   return (
     <div className="space-y-6">
       <SaludoDashboard
         nombre={nombre}
-        subtitulo={`Honorable Consejo Departamental · DACEFyN UNLaR · Protocolización y Resoluciones Ciclo ${ciclo}`}
+        subtitulo={`Honorable Consejo Departamental · DACEFyN UNLaR · Protocolización Ciclo ${ciclo}`}
         extra={
-          <div role="radiogroup" aria-label="Alcance del panel" className="inline-flex self-start rounded-lg border border-border bg-background p-0.5 text-xs sm:self-auto">
-            {(
-              [
-                ['ciclo', `Ciclo ${ciclo}`],
-                ['todos', 'Todos los ciclos'],
-              ] as const
-            ).map(([k, l]) => (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={alcance === k}
-                onClick={() => setAlcance(k)}
-                className={`rounded-md px-3 py-1.5 font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
-                  alcance === k ? 'bg-surface text-primary shadow-sm' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <>
+            <Pastillas
+              etiqueta="Alcance del panel"
+              valor={alcance}
+              onChange={setAlcance}
+              opciones={[
+                { key: 'ciclo', label: `Ciclo ${ciclo}` },
+                { key: 'todos', label: 'Todos los ciclos' },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => nav.goToPlanificaciones({ ...f, state: 'ELEVADO_AL_CONSEJO' })}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Elevados al Consejo →
+            </button>
+          </>
         }
       />
 
-      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          titulo="Elevados para tratamiento en sesión"
-          valor={pendientesSesion.length}
-          detalle="Pendientes de Expediente y Resolución CD"
-          tono="revision"
-          icono={<IconClock className="h-4 w-4" />}
-          onClick={() => nav.goToPlanificaciones({ ...f, state: 'ELEVADO_AL_CONSEJO' })}
-        />
-        <KpiCard
-          titulo="Cátedras finalizadas (con Resolución CD)"
-          valor={finalizadas}
-          detalle={`${pct(finalizadas, total)}% del padrón de asignaturas`}
-          tono="finalizado"
-          icono={<IconSeal className="h-4 w-4" />}
-          onClick={() => nav.goToPlanificaciones({ ...f, state: 'FINALIZADO' })}
-        />
-        <KpiCard
-          titulo="Total evaluadas favorablemente"
-          valor={favorables.length}
-          detalle="Dictamen UAP y de Dirección favorables (plenas, elevadas y finalizadas)"
-          tono="aprobado"
-          icono={<IconCheck className="h-4 w-4" />}
-          onClick={() => nav.goToPlanificaciones({ ...f, vista: 'historicas' })}
-        />
-        <KpiCard
-          titulo="Avance del padrón curricular"
-          valor={`${pct(favorables.length, total)}%`}
-          detalle={
-            <span className="mt-1 block space-y-1">
-              <span className="block">
-                {favorables.length} con dictámenes completos · {previas} en circuito previo
-              </span>
-              <BarraAvance valor={pct(favorables.length, total)} etiqueta="Cátedras con dictámenes completos" />
-            </span>
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
+        <DonutChartCard
+          className="lg:col-span-8"
+          titulo="Embudo de protocolización curricular (padrón departamental)"
+          centro="Cátedras"
+          segmentos={[
+            { key: 'fin', label: 'Finalizados con Resolución CD', valor: finalizadas.length, color: COLOR.aprobado, onClick: () => setFiltro('finalizadas') },
+            { key: 'elev', label: 'Elevados para tratamiento en sesión', valor: elevadas.length, color: COLOR.elevado, onClick: () => setFiltro('pendientes') },
+            { key: 'plena', label: 'Con aprobación plena (listos para elevar)', valor: plenas.length, color: COLOR.pleno, onClick: () => setFiltro('pendientes') },
+            { key: 'previo', label: 'En circuito previo', valor: previas, color: COLOR.pendiente, onClick: () => nav.goToPlanificaciones({ ...f, vista: 'activas' }) },
+          ]}
+          pie={
+            <MetricaBarra
+              titulo="Cobertura de resoluciones sobre cátedras evaluadas favorablemente"
+              valor={finalizadas.length}
+              total={favorables.length}
+              texto={`${finalizadas.length} de ${favorables.length} protocolizadas`}
+            />
           }
-          tono="neutro"
-          icono={<IconDocs className="h-4 w-4" />}
         />
+
+        <section className="flex flex-col justify-between gap-5 rounded-2xl border border-border bg-surface p-6 shadow-sm lg:col-span-4">
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-ink">Estado de informes reglamentarios</h2>
+              <p className="mt-0.5 text-[11px] text-muted">Ord. HCS N° 219/2022 · {total} cátedras</p>
+            </div>
+            <ul className="space-y-4">
+              {informes.map((i) => (
+                <li key={i.key} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-ink">{i.label}</span>
+                    <span className="tabular-nums">
+                      <strong className="text-ink">{pct(i.valor, total)}%</strong>
+                      <span className="ml-1 text-[11px] text-muted">
+                        ({i.valor}/{total})
+                      </span>
+                    </span>
+                  </div>
+                  <BarraProgreso valor={pct(i.valor, total)} etiqueta={i.label} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => nav.goToPlanificaciones({ ...f, state: 'APROBADO_PLENO' })} className={linkCls}>
+            Ver cátedras con aprobación plena →
+          </button>
+        </section>
       </div>
 
-      <Panel titulo="Progreso de protocolización por carrera">
-        <ul className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-          {carreras.map((c) => {
-            const lista = paacsDe(paacs, c.id, asigContext);
-            const fin = contar(lista, (d) => d.state === 'FINALIZADO');
-            const evaluadas = contar(lista, (d) => d.state === 'APROBADO_PLENO' || d.state === 'ELEVADO_AL_CONSEJO');
-            const previa = lista.length - fin - evaluadas;
-            const fc = { ...f, careerId: c.id };
-            return (
-              <li key={c.id} className="space-y-3 rounded-2xl border border-border bg-surface p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-ink">
-                    <span className="rounded bg-soft px-2 py-0.5 text-[11px] font-bold text-primary">{c.sigla}</span>
-                    <span className="truncate">{c.nombre}</span>
-                  </p>
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted">{lista.length} cátedras</span>
-                </div>
-                <BarraSegmentos
-                  etiqueta={`Protocolización de ${c.sigla}`}
-                  segmentos={[
-                    { key: 'fin', label: 'Finalizadas con Resolución', valor: fin, tono: 'finalizado', onClick: () => nav.goToPlanificaciones({ ...fc, state: 'FINALIZADO' }) },
-                    { key: 'eval', label: 'Evaluadas / elevadas', valor: evaluadas, tono: 'aprobado', onClick: () => nav.goToPlanificaciones({ ...fc, vista: 'historicas' }) },
-                    { key: 'previa', label: 'Instancia previa', valor: previa, tono: 'borrador', onClick: () => nav.goToPlanificaciones({ ...fc, vista: 'activas' }) },
-                  ]}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      </Panel>
+      <div role="group" aria-label="Filtrar las cátedras evaluadas" className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((k) => (
+          <KpiFilterCard
+            key={k.key}
+            titulo={k.titulo}
+            valor={k.valor}
+            detalle={k.detalle}
+            icono={k.icono}
+            color={k.color}
+            activo={filtro === k.key}
+            // "En circuito previo" no está en la lista de evaluadas: lleva al listado.
+            onFiltrar={k.key === 'previas' ? k.ir : () => setFiltro(k.key as FiltroConsejo)}
+            onIr={k.key === 'previas' ? undefined : k.ir}
+          />
+        ))}
+      </div>
 
-      <Panel titulo="Cátedras evaluadas favorablemente y finalizadas" accion={<span className="text-[11px] tabular-nums text-muted">{listado.length} cátedras</span>}>
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-xs">
-            <thead>
-              <tr className="border-b border-border bg-background text-[11px] text-muted">
-                <th scope="col" className="w-[22%] px-4 py-3 font-semibold">Asignatura</th>
-                <th scope="col" className="w-[13%] px-3 py-3 font-semibold">Carrera · Plan</th>
-                <th scope="col" className="w-[7%] px-3 py-3 font-semibold">Régimen</th>
-                <th scope="col" className="w-[15%] px-3 py-3 font-semibold">Responsable</th>
-                <th scope="col" className="w-[14%] px-3 py-3 font-semibold">Estado</th>
-                <th scope="col" className="w-[13%] px-3 py-3 font-semibold">Informes</th>
-                <th scope="col" className="w-[16%] px-4 py-3 text-right font-semibold">Expediente / Resolución</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {listado.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted">
-                    No hay cátedras evaluadas favorablemente {alcance === 'ciclo' ? `en el ciclo ${ciclo}` : 'todavía'}.
-                  </td>
-                </tr>
-              )}
-              {listado.map((d) => {
-                const ctx = asigContext(d.asignaturaId);
-                return (
-                  <tr key={d.id} className="transition-colors hover:bg-background">
-                    <td className="min-w-0 px-4 py-3">
-                      <span className="block truncate font-semibold text-ink" title={ctx.asig?.nombre}>
-                        {ctx.asig?.nombre ?? d.asignaturaId}
-                      </span>
-                      <span className="block text-[11px] text-muted">Ciclo {d.cycle}</span>
-                    </td>
-                    <td className="min-w-0 px-3 py-3">
-                      <span className="block font-semibold text-primary">{ctx.carrera?.sigla}</span>
-                      <span className="block truncate text-[11px] text-muted" title={ctx.plan?.ordenanza}>
-                        {ctx.plan?.ordenanza}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-ink">{ctx.asig ? REGIMEN[ctx.asig.regimenDictado] : '—'}</td>
-                    <td className="min-w-0 px-3 py-3">
-                      <span className="block truncate text-ink" title={fullName(d.owner)}>
-                        {fullName(d.owner)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge state={d.state} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="flex flex-col items-start gap-1">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400">
-                          <IconCheck className="h-3 w-3" /> UAP (Anexo III)
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400">
-                          <IconCheck className="h-3 w-3" /> Dirección (Anexo IV)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => nav.onOpenReport(d.id)}
-                          className="text-[11px] font-semibold text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                        >
-                          Ver informes (PDF)
-                        </button>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {d.state === 'FINALIZADO' ? (
-                        <span className="block">
-                          <span className="block font-mono font-semibold text-primary">{d.expediente || '—'}</span>
-                          <span className="block text-[11px] text-muted">{d.resolucion || 'Resolución en trámite'}</span>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onFormalizar(d.id)}
-                          className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        >
-                          Formalizar expediente
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <CareerComparisonMatrix
+            titulo="Protocolización por carrera"
+            modos={[
+              {
+                key: 'proto',
+                label: 'Protocolización',
+                unidad: 'cátedras',
+                total,
+                filas: datos.carreras.map((c) => {
+                  const l = paacsDe(paacs, c.id, asigContext);
+                  const fin = contar(l, (d) => d.state === 'FINALIZADO');
+                  const fc = { ...f, careerId: c.id };
+                  return {
+                    carrera: c,
+                    ordenanza: ordenanzaDe(paacs, c.id, asigContext),
+                    avance: pct(fin, l.length),
+                    celdas: [
+                      { key: 'fin', label: 'Finalizadas', valor: fin, color: COLOR.aprobado, onClick: () => nav.goToPlanificaciones({ ...fc, state: 'FINALIZADO' }) },
+                      { key: 'elev', label: 'Elevadas / plenas', valor: contar(l, (d) => PENDIENTES.includes(d.state)), color: COLOR.elevado, onClick: () => nav.goToPlanificaciones({ ...fc, state: 'ELEVADO_AL_CONSEJO' }) },
+                      { key: 'previo', label: 'Circuito previo', valor: contar(l, (d) => !ESTADOS_FAVORABLES.includes(d.state)), color: COLOR.pendiente, onClick: () => nav.goToPlanificaciones({ ...fc, vista: 'activas' }) },
+                    ],
+                  };
+                }),
+              },
+            ]}
+            nota="Avance: cátedras finalizadas con Resolución CD sobre el total de la carrera."
+          />
         </div>
-      </Panel>
+
+        <Panel
+          titulo={filtro === 'finalizadas' ? 'Cátedras finalizadas' : filtro === 'pendientes' ? 'Pendientes de protocolizar' : 'Cátedras evaluadas favorablemente'}
+          className="lg:col-span-7"
+          accion={<span className="text-[11px] tabular-nums text-muted">{lista.length}</span>}
+        >
+          {lista.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border bg-surface px-4 py-8 text-center text-xs text-muted">
+              No hay cátedras en este estado {alcance === 'ciclo' ? `en el ciclo ${ciclo}` : ''}.
+            </p>
+          ) : (
+            <ul className="space-y-3.5">
+              {lista.map((d) => {
+                const tarjeta = tarjetaDe(d, datos);
+                tarjeta.acento = d.state === 'FINALIZADO' ? COLOR.aprobado : d.state === 'ELEVADO_AL_CONSEJO' ? COLOR.elevado : COLOR.pleno;
+                tarjeta.extra =
+                  d.state === 'FINALIZADO' ? (
+                    <span className="text-right text-[11px] leading-tight">
+                      <span className="block font-mono font-semibold text-primary">{d.expediente || '—'}</span>
+                      <span className="block text-muted">{d.resolucion || 'Resolución en trámite'}</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onFormalizar(d.id);
+                      }}
+                      className="relative z-10 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      Formalizar Expediente y Resolución
+                    </button>
+                  );
+                return <SelectableCatedraCard key={d.id} c={tarjeta} onOpen={() => nav.onOpenDoc(d.id)} onReport={() => nav.onOpenReport(d.id)} />;
+              })}
+            </ul>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }

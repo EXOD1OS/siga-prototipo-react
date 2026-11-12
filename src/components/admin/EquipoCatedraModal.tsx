@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Modal, ModalButton } from '../shared/Modal';
-import { StatusBadge } from '../shared/StatusBadge';
 import {
   CARGOS_CATEDRA,
   type AsigContext,
-  type DocumentoResumen,
   type EquipoCatedra,
   type IntegranteBorrador,
   type Usuario,
@@ -15,7 +13,6 @@ interface EquipoCatedraModalProps {
   cycle: number;
   equipo: EquipoCatedra[];
   docentes: Usuario[];
-  docs: DocumentoResumen[];
   onClose: () => void;
   onSave: (asigId: string, integrantes: IntegranteBorrador[]) => void;
 }
@@ -31,7 +28,7 @@ function toBorrador(equipo: EquipoCatedra[]): IntegranteBorrador[] {
  * Gestión del equipo de cátedra de una asignatura para el ciclo lectivo vigente.
  * Disposición basada en GestionEquipoModal de la interfaz anterior.
  */
-export function EquipoCatedraModal({ ctx, cycle, equipo, docentes, docs, onClose, onSave }: EquipoCatedraModalProps) {
+export function EquipoCatedraModal({ ctx, cycle, equipo, docentes, onClose, onSave }: EquipoCatedraModalProps) {
   const [inicial] = useState(() => toBorrador(equipo));
   const [integrantes, setIntegrantes] = useState<IntegranteBorrador[]>(inicial);
   const [nuevoDocenteId, setNuevoDocenteId] = useState('');
@@ -84,8 +81,6 @@ export function EquipoCatedraModal({ ctx, cycle, equipo, docentes, docs, onClose
     const u = docenteBy.get(id);
     return u ? `${u.nombre} ${u.apellido}` : id;
   };
-
-  const estadoPaad = (docenteId: string) => docs.find((d) => d.type === 'PAAD' && d.owner === docenteId)?.state;
 
   return (
     <Modal
@@ -149,7 +144,6 @@ export function EquipoCatedraModal({ ctx, cycle, equipo, docentes, docs, onClose
 
         <div className="space-y-2">
           {integrantes.map((m) => {
-            const estado = estadoPaad(m.docenteId);
             return (
               <div key={m.id} className="flex flex-wrap items-center gap-3 border border-border rounded-lg px-3 py-2">
                 <label className="flex items-center gap-1.5 text-xs text-muted shrink-0 cursor-pointer">
@@ -169,7 +163,6 @@ export function EquipoCatedraModal({ ctx, cycle, equipo, docentes, docs, onClose
                   {nombreDocente(m.docenteId)}
                   <span className="block text-[11px] text-muted truncate">{docenteBy.get(m.docenteId)?.email}</span>
                 </span>
-                {estado && <StatusBadge state={estado} />}
                 <label className="sr-only" htmlFor={`cargo-${m.id}`}>
                   Cargo de {nombreDocente(m.docenteId)}
                 </label>

@@ -462,7 +462,6 @@ export function AdminEstructuraView({
           cycle={S.cycle}
           equipo={equipoDeAsig(modalAsigId)}
           docentes={docentes}
-          docs={S.docs}
           onSave={onSaveEquipo}
           onClose={cerrarEquipo}
         />

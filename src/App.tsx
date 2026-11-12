@@ -326,6 +326,8 @@ export default function App() {
     paacs,
     paads,
     carreras: S.carreras,
+    usuarios: S.usuarios,
+    equipos: S.equiposCatedra,
     asigContext,
     fullName,
   };
@@ -402,7 +404,6 @@ export default function App() {
               careerId={careerId}
               asignaturas={S.asignaturas}
               planes={S.planes}
-              equipos={S.equiposCatedra}
             />
           )}
 

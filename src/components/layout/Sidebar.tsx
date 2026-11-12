@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType, type SVGProps } from 'react';
 import { ROLES } from '../../data/mockData';
-import { IconCollapse, IconDocs, IconHome, IconInbox, IconSeal, IconStructure, IconUserDoc, IconUsers } from './icons';
+import { IconCollapse, IconDocs, IconHome, IconInbox, IconStructure, IconUserDoc, IconUsers } from './icons';
 
 interface Props {
   role: string;
@@ -55,9 +55,6 @@ export function Sidebar({ role, page, onNavigate, cycle }: Props) {
     ];
     if (role.startsWith('DOCENTE')) list.push({ id: 'mi-paad', label: 'Mi PAAD Anual', Icon: IconUserDoc });
     else list.push({ id: 'paads', label: 'Bandeja de PAADs', Icon: IconInbox });
-    if (['DIRECCION_CARRERA', 'UAP', 'CONSEJO_DEPARTAMENTAL', 'ADMINISTRADOR'].includes(role)) {
-      list.push({ id: 'anexo-v', label: 'Anexo V y Elevación', Icon: IconSeal });
-    }
     if (role === 'ADMINISTRADOR') {
       list.push({ id: 'admin-estructura', label: 'Estructura y Equipos', Icon: IconStructure });
       list.push({ id: 'admin-usuarios', label: 'Usuarios y Accesos', Icon: IconUsers });
