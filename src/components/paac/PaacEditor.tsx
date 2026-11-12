@@ -3,7 +3,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { AvisoEstado, avisoDeDocumento } from '../shared/AvisoEstado';
 import { BadgeObservaciones, BarraPresentacion } from '../shared/EdicionDocumento';
 import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
-import { IconCheck, IconEye } from '../layout/icons';
+import { IconAlert, IconCheck, IconEye, IconSend } from '../layout/icons';
 import { esReenvio } from '../../lib/revision';
 import { ObservationFieldWrapper } from '../shared/ObservationFieldWrapper';
 import { RichTextEditor } from '../shared/RichTextEditor';
@@ -22,7 +22,7 @@ import {
   type LibroFisico,
   type PaacContenido,
 } from '../../types/paac';
-import type { DocumentoEditable, ObservacionDoc } from '../../types/planificacion';
+import { ETAPA_PAAC, etapaPaac, type DocumentoEditable, type ObservacionDoc } from '../../types/planificacion';
 
 export interface IntegrantePaad {
   docenteId: string;
@@ -61,6 +61,8 @@ interface Props {
   onSubmitDoc: () => void;
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
+  /** UAP / Dirección / Admin eliminan una observación propia. */
+  onDeleteObs: (obsId: string) => void;
 }
 
 type Vista = 'form' | 'preview';
@@ -78,6 +80,8 @@ interface ContextoCampos {
   invalido: (fKey: string) => boolean;
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
+  /** UAP / Dirección / Admin eliminan una observación propia. */
+  onDeleteObs: (obsId: string) => void;
 }
 
 const CamposCtx = createContext<ContextoCampos | null>(null);
@@ -102,6 +106,7 @@ function Campo({ fKey, sec, label, info, children }: { fKey: string; sec: number
       role={ctx.role}
       onAddObs={(k, path, txt) => ctx.onAddObs(k, path, txt, sec)}
       onResolveObs={ctx.onResolveObs}
+      onDeleteObs={ctx.onDeleteObs}
     >
       {children}
     </ObservationFieldWrapper>
@@ -158,6 +163,7 @@ export function PaacEditor({
   onSubmitDoc,
   onAddObs,
   onResolveObs,
+  onDeleteObs,
 }: Props) {
   const [vista, setVista] = useState<Vista>('form');
   const [intento, setIntento] = useState(false);
@@ -192,6 +198,8 @@ export function PaacEditor({
   };
 
   const pendientesTotales = d.comments.filter((o) => !o.resolved).length;
+  // Etapa de presentación del PAAC: "Presentado" en revisión, "Correcciones" si fue observado.
+  const etapa = etapaPaac(d);
   const aviso = avisoDeDocumento({ d, tipo: 'PAAC', canEdit, canObserve, esDocente: role.startsWith('DOCENTE'), pendientes: pendientesTotales });
 
   const obsPendientesSec = (sec: number) => d.comments.filter((o) => !o.resolved && o.section === sec).length;
@@ -206,6 +214,7 @@ export function PaacEditor({
     invalido: (fKey) => mostrarErrores && apartados.some((a) => a.campos.some((f) => f.fKey === fKey && !f.ok)),
     onAddObs,
     onResolveObs,
+    onDeleteObs,
   };
 
   const setBiblio = (tipo: 'basica' | 'complementaria', b: BloqueBibliografia) => set('bibliografia', { ...c.bibliografia, [tipo]: b });
@@ -275,6 +284,13 @@ export function PaacEditor({
         <div>
           <div className="mb-1 flex flex-wrap items-center gap-2.5">
             <StatusBadge state={d.state} />
+            {etapa !== 'SIN_INICIAR' && (
+              <span className={`inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-0.5 text-[10px] font-bold ${ETAPA_PAAC[etapa].cls}`}>
+                {etapa === 'EN_CORRECCION' && <IconAlert className="h-3 w-3" />}
+                {etapa === 'PRESENTADO' && <IconSend className="h-3 w-3" />}
+                {ETAPA_PAAC[etapa].label}
+              </span>
+            )}
             <span className="text-xs text-muted">
               PAAC · Ciclo {d.cycle} · {subtitulo} · {porCompetencias ? 'Plan por competencias' : 'Plan tradicional'}
             </span>
@@ -331,7 +347,7 @@ export function PaacEditor({
       ) : (
         <CamposCtx.Provider value={ctxCampos}>
           {aviso && (
-            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo}>
+            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo} etiqueta={aviso.etiqueta}>
               {aviso.texto}
             </AvisoEstado>
           )}

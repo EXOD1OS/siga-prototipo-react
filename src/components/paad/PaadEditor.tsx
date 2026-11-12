@@ -29,6 +29,8 @@ interface PaadEditorProps {
   onSubmitDoc: () => void;
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
+  /** UAP / Dirección / Admin eliminan una observación propia. */
+  onDeleteObs: (obsId: string) => void;
 }
 
 type Vista = 'form' | 'preview';
@@ -51,6 +53,7 @@ export function PaadEditor({
   onSubmitDoc,
   onAddObs,
   onResolveObs,
+  onDeleteObs,
 }: PaadEditorProps) {
   const [vista, setVista] = useState<Vista>('form');
   const [intento, setIntento] = useState(false);
@@ -176,7 +179,7 @@ export function PaadEditor({
       ) : (
         <>
           {aviso && (
-            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo}>
+            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo} etiqueta={aviso.etiqueta}>
               {aviso.texto}
             </AvisoEstado>
           )}
@@ -308,6 +311,7 @@ export function PaadEditor({
                         role={role}
                         onAddObs={(k, path, txt) => onAddObs(k, path, txt, ap.numero)}
                         onResolveObs={onResolveObs}
+                        onDeleteObs={onDeleteObs}
                       >
                         <div className="space-y-4">
                           {sub.listas.map((l) => (
@@ -341,6 +345,7 @@ export function PaadEditor({
                   role={role}
                   onAddObs={(k, path, txt) => onAddObs(k, path, txt, SEC_HORAS)}
                   onResolveObs={onResolveObs}
+                  onDeleteObs={onDeleteObs}
                 >
                   <MatrizHorasPaad horas={contenido.horas} editable={canEdit} onChange={(horas) => onUpdatePaad({ ...contenido, horas })} />
                 </ObservationFieldWrapper>

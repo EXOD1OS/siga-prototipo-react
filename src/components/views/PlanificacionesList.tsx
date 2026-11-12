@@ -3,7 +3,6 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
 import { ROLES_DEPARTAMENTALES, esSesionDocente, puedeVerPlanificacion } from '../../lib/visibilidad';
 import { areaDeRol, ESTADOS_EN_REVISION, observacionesPendientesDe, type ResultadoRevision } from '../../lib/revision';
-import { IconAlert } from '../layout/icons';
 import type { AsigContext, Carrera, EquipoCatedra } from '../../types/estructura';
 import {
   DICTAMEN_BADGE,
@@ -232,7 +231,13 @@ export function PlanificacionesList({
     return {
       revision:
         puedeEvaluar && area
-          ? { area, pendientes: observacionesPendientesDe(d, area), onFinalizar: (r) => onFinalizarRevision(d.id, r) }
+          ? {
+              area,
+              pendientes: observacionesPendientesDe(d, area),
+              onFinalizar: (r) => onFinalizarRevision(d.id, r),
+              // El dictamen favorable se emite desde el informe oficial autocompletado.
+              onAbrirInforme: cerrarY(onOpenReport),
+            }
           : null,
       onEvaluar: puedeEvaluar ? cerrarY(onOpenReport) : null,
       onElevar: esDireccion && d.state === 'APROBADO_PLENO' ? cerrarY(onElevarPaac) : null,
@@ -413,14 +418,7 @@ export function PlanificacionesList({
                       />
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex flex-col items-start gap-1">
-                        <StatusBadge state={d.state} />
-                        {obs > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                            <IconAlert className="h-3 w-3" /> {obs} obs. pendiente(s)
-                          </span>
-                        )}
-                      </div>
+                      <StatusBadge state={d.state} pendientes={obs} />
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
@@ -510,6 +508,8 @@ export function PlanificacionesList({
           doc={docInformes}
           ctx={asigContext(docInformes.asignaturaId)}
           responsable={fullName(docInformes.owner)}
+          equipo={equiposCatedra.filter((e) => e.asignaturaId === docInformes.asignaturaId && e.cicloLectivo === cycle)}
+          fullName={fullName}
           acciones={accionesPara(docInformes)}
           onClose={() => setInformesId(null)}
         />

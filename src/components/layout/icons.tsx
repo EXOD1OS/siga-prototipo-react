@@ -173,6 +173,13 @@ export const IconEye = (p: IconProps) => (
   </Base>
 );
 
+export const IconRefresh = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+    <path d="M19.5 4.5v4h-4" />
+  </Base>
+);
+
 export const IconClose = (p: IconProps) => (
   <Base {...p}>
     <path d="m6.5 6.5 11 11M17.5 6.5l-11 11" />

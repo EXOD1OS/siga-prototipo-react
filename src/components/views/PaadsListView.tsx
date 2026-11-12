@@ -99,7 +99,7 @@ export function PaadsListView({
           >
             <option value="ALL">Todos los estados de PAAD</option>
             <option value="BORRADOR">Borrador</option>
-            <option value="ENVIADO_A_REVISION">Presentado · En revisión</option>
+            <option value="ENVIADO_A_REVISION">En revisión</option>
             <option value="OBSERVADO">Observado</option>
             <option value="APROBADO">PAAD Aprobado</option>
           </select>
@@ -165,7 +165,7 @@ export function PaadsListView({
                         )}
                       </td>
                       <td className="p-4">
-                        <StatusBadge state={d.state} />
+                        <StatusBadge state={d.state} pendientes={d.comments?.filter((o: { resolved: boolean }) => !o.resolved).length ?? 0} />
                       </td>
                       <td className="p-4 space-y-1">
                         <div>

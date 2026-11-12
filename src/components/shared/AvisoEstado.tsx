@@ -42,13 +42,16 @@ export function IconoEstado({ tono, className = 'h-8 w-8' }: { tono: TonoAviso; 
   );
 }
 
-export function AvisoEstado({ tono, titulo, children }: { tono: TonoAviso; titulo: string; children?: ReactNode }) {
+export function AvisoEstado({ tono, titulo, etiqueta, children }: { tono: TonoAviso; titulo: string; etiqueta?: string; children?: ReactNode }) {
   const t = TONOS[tono];
   return (
     <div role={t.rol} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-xs ${t.caja}`}>
       <IconoEstado tono={tono} />
       <div className="min-w-0 pt-0.5">
-        <p className="font-semibold">{titulo}</p>
+        <p className="flex flex-wrap items-center gap-2 font-semibold">
+          {etiqueta && <span className="rounded-md border border-current px-1.5 py-px text-[10px] font-bold uppercase tracking-wider opacity-80">{etiqueta}</span>}
+          {titulo}
+        </p>
         {children && <div className="mt-0.5 leading-relaxed opacity-90">{children}</div>}
       </div>
     </div>
@@ -64,13 +67,15 @@ export function avisoDeDocumento(opts: {
   esDocente: boolean;
   /** Observaciones que el docente todavía no marcó como subsanadas. */
   pendientes: number;
-}): { tono: TonoAviso; titulo: string; texto?: string } | null {
+}): { tono: TonoAviso; titulo: string; texto?: string; etiqueta?: string } | null {
   const { d, tipo, canEdit, canObserve, esDocente, pendientes } = opts;
   const enCorreccion = esReenvio(d);
   if (canEdit) {
     if (!enCorreccion) return null;
     return {
       tono: 'observado',
+      // En el PAAC la etapa de corrección se rotula "Correcciones".
+      etiqueta: tipo === 'PAAC' ? 'Correcciones' : undefined,
       titulo: 'Documento con observaciones pendientes de corrección.',
       texto:
         pendientes > 0
@@ -93,10 +98,15 @@ export function avisoDeDocumento(opts: {
           texto: tipo === 'PAAC' ? 'Solo el Docente Responsable de la cátedra edita y presenta el PAAC.' : 'Solo el docente titular del PAAD puede editarlo.',
         }
       : {
-          tono: 'lectura',
+          tono: enCorreccion ? 'observado' : 'lectura',
+          etiqueta: enCorreccion && tipo === 'PAAC' ? 'Correcciones' : undefined,
           titulo: 'Vista de consulta.',
-          texto: enCorreccion ? 'El documento fue devuelto al docente y está en corrección.' : 'El documento todavía no fue presentado.',
+          texto: enCorreccion ? 'El documento fue devuelto al docente con observaciones pendientes.' : 'El documento todavía no fue presentado.',
         };
   }
-  return { tono: 'lectura', titulo: 'El documento ya fue presentado: se muestra en modo lectura.' };
+  return {
+    tono: 'lectura',
+    etiqueta: tipo === 'PAAC' && d.state === 'ENVIADO_A_REVISION' ? 'Presentado' : undefined,
+    titulo: 'El documento ya fue presentado: se muestra en modo lectura.',
+  };
 }

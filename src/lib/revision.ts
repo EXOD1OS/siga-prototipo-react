@@ -71,13 +71,15 @@ export function finalizarRevision<T extends DocRevisable>(
   doc: T,
   area: AreaRevision,
   resultado: ResultadoRevision,
-  firma: { autor: string; fecha: string }
+  firma: { autor: string; fecha: string },
+  /** Contenido del informe (Anexo III / IV) que se guarda junto con el dictamen. */
+  datosInforme?: Partial<InformeEvaluacion>
 ): ResultadoTransicion<T> {
   const { informe, aprobado } = claves(area);
   if (resultado === 'FAVORABLE' && observacionesPendientesDe(doc, area) > 0) {
     return { doc, error: 'No se puede emitir un dictamen favorable mientras tengas observaciones sin subsanar.' };
   }
-  const base: InformeEvaluacion = doc[informe] ?? { items: {} };
+  const base: InformeEvaluacion = { items: {}, ...doc[informe], ...datosInforme };
   const next = {
     ...doc,
     [informe]: { ...base, dictamen: resultado === 'FAVORABLE' ? 'APROBADO' : 'OBSERVADO', by: firma.autor, fecha: firma.fecha },
@@ -90,7 +92,7 @@ export function finalizarRevision<T extends DocRevisable>(
 
 /**
  * Presentación del docente. Si venía observado ("Subsanar y volver a presentar"),
- * los dictámenes observados pasan a "Pendiente de re-evaluación" y los favorables se conservan.
+ * los dictámenes observados vuelven a "En revisión" y los favorables se conservan.
  */
 export function presentarDocumento<T extends DocRevisable>(doc: T): T {
   const reevaluar = (inf: InformeEvaluacion | undefined): InformeEvaluacion | undefined =>

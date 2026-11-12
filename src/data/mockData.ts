@@ -13,6 +13,7 @@ import type {
 import { matrizVacia, paadVacio, type PaadContenido } from '../types/paad';
 import { horarioVacio, paacVacio, type PaacContenido, type SemanaCronograma } from '../types/paac';
 import { paacDesdeDatosAnteriores } from '../lib/paac';
+import { sugerirInformeDisciplinar, sugerirInformePedagogico } from '../lib/informes';
 
 /**
  * Perfiles del selector "Vista de Rol" (simulación de sesión del prototipo).
@@ -626,5 +627,24 @@ export function createInitialData() {
     };
   });
 
-  return { cycle: 2026, sedes, departamentos, carreras, planes, asignaturas, usuarios, equiposCatedra, periodos, docs: [...docs, ...paads] };
+  // Informes favorables ya emitidos: se completan con el cuadro oficial (Ord. 219/22, Anexos III y IV)
+  // a partir del propio PAAC, como lo haría el autocompletado al confirmar el dictamen.
+  const todos = [...docs, ...paads];
+  const nombreDe = (id: string) => {
+    const u = usuarios.find((x) => x.id === id);
+    return u ? `${u.nombre} ${u.apellido}` : id;
+  };
+  for (const d of docs as any[]) {
+    if (d.type !== 'PAAC') continue;
+    const fuente = { cycle: d.cycle, data: d.data ?? {}, paac: d.paac, comments: d.comments ?? [] };
+    if (d.discReport?.dictamen === 'APROBADO' && !d.discReport.disciplinar) {
+      const equipo = equiposCatedra.filter((e) => e.asignaturaId === d.asignaturaId && e.cicloLectivo === d.cycle);
+      d.discReport.disciplinar = sugerirInformeDisciplinar({ d: fuente, equipo, docs: todos, fullName: nombreDe });
+    }
+    if (d.pedReport?.dictamen === 'APROBADO' && !d.pedReport.pedagogico) {
+      d.pedReport.pedagogico = sugerirInformePedagogico(fuente);
+    }
+  }
+
+  return { cycle: 2026, sedes, departamentos, carreras, planes, asignaturas, usuarios, equiposCatedra, periodos, docs: todos };
 }

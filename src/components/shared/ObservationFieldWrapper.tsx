@@ -12,7 +12,13 @@ interface Props {
   role: string;
   onAddObs: (fKey: string, campoPath: string, text: string) => void;
   onResolveObs: (obsId: string) => void;
+  onDeleteObs: (obsId: string) => void;
   children: ReactNode;
+}
+
+/** UAP y Dirección eliminan solo las observaciones de su área; el Administrador, cualquiera. */
+export function puedeEliminarObservacion(role: string, o: Pick<ObservacionDoc, 'area'>): boolean {
+  return (role === 'UAP' && o.area === 'uap') || (role === 'DIRECCION_CARRERA' && o.area === 'direccion') || role === 'ADMINISTRADOR';
 }
 
 const AREA = {
@@ -31,7 +37,7 @@ const AREA = {
 } as const;
 
 /** Campo del documento con su riel de observaciones (UAP / Dirección) y la acción de subsanar. */
-export function ObservationFieldWrapper({ fKey, label, campoPath, notes, canEdit, canObserve, role, onAddObs, onResolveObs, children }: Props) {
+export function ObservationFieldWrapper({ fKey, label, campoPath, notes, canEdit, canObserve, role, onAddObs, onResolveObs, onDeleteObs, children }: Props) {
   const [draftNote, setDraftNote] = useState('');
   const idNota = useId();
   const hasUnresolved = notes.some((o) => !o.resolved);
@@ -72,7 +78,19 @@ export function ObservationFieldWrapper({ fKey, label, campoPath, notes, canEdit
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className={`truncate text-[11px] font-bold ${a.autor}`}>{o.author ?? a.nombre}</span>
-                      <span className="shrink-0 text-[10px] text-muted">{o.date}</span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span className="text-[10px] text-muted">{o.date}</span>
+                        {puedeEliminarObservacion(role, o) && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteObs(o.id)}
+                            aria-label={`Eliminar observación de ${o.author ?? a.nombre}`}
+                            className="rounded bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-danger transition hover:bg-rose-600 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </span>
                     </div>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-ink">{o.text}</p>
                     <p className="mt-1 text-[10px] text-muted">{o.resolved ? 'Subsanada por el docente' : 'Pendiente de subsanación'}</p>

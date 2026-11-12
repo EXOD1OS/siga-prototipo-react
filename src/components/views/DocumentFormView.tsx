@@ -28,6 +28,8 @@ interface DocumentFormViewProps {
   onSubmitDoc: () => void;
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
+  /** UAP / Dirección / Admin eliminan una observación propia. */
+  onDeleteObs: (obsId: string) => void;
   onOpenReport: (id: string) => void;
   onOpenPaadModal: (paadId: string) => void;
   /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa este documento). */
@@ -53,6 +55,7 @@ export function DocumentFormView({
   onSubmitDoc,
   onAddObs,
   onResolveObs,
+  onDeleteObs,
   onOpenReport,
   onOpenPaadModal,
   revision,
@@ -83,6 +86,7 @@ export function DocumentFormView({
         onSubmitDoc={onSubmitDoc}
         onAddObs={onAddObs}
         onResolveObs={onResolveObs}
+        onDeleteObs={onDeleteObs}
       />
     );
   }
@@ -130,6 +134,7 @@ export function DocumentFormView({
       onSubmitDoc={onSubmitDoc}
       onAddObs={onAddObs}
       onResolveObs={onResolveObs}
+      onDeleteObs={onDeleteObs}
     />
   );
 }

@@ -1,15 +1,15 @@
-import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useState, type KeyboardEvent } from 'react';
 import { Modal, ModalButton } from '../shared/Modal';
 import { StatusBadge } from '../shared/StatusBadge';
 import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
-import { DISCITEMS, PEDITEMS } from '../../data/mockData';
-import type { AsigContext } from '../../types/estructura';
+import { InformeLectura } from '../informes/InformeLectura';
+import { encabezadoInforme, integrantesEquipo } from '../../lib/informes';
+import type { AsigContext, EquipoCatedra } from '../../types/estructura';
 import {
   DICTAMEN_BADGE,
   DICTAMEN_LABELS,
   dictamenDe,
   type Dictamen,
-  type InformeEvaluacion,
   type PaacDoc,
 } from '../../types/planificacion';
 
@@ -26,6 +26,9 @@ interface InformesModalProps {
   doc: PaacDoc;
   ctx: AsigContext;
   responsable: string;
+  /** Equipo de cátedra del ciclo (encabezado del Informe Pedagógico). */
+  equipo: EquipoCatedra[];
+  fullName: (id: string) => string;
   acciones: AccionesInforme;
   onClose: () => void;
 }
@@ -40,90 +43,11 @@ function DictamenBadge({ value }: { value: Dictamen }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-2">
-      <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function Pendiente({ quien }: { quien: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-background px-4 py-8 text-center">
-      <DictamenBadge value="PENDIENTE" />
-      <p className="mt-2 text-sm font-medium text-ink">Pendiente de evaluación</p>
-      <p className="mt-1 text-xs text-muted">
-        Este informe lo elabora {quien} una vez que la planificación es enviada a revisión. Todavía no fue emitido.
-      </p>
-    </div>
-  );
-}
-
-function InformeArea({
-  informe,
-  dictamen,
-  items,
-  observaciones,
-  titulo,
-  quien,
-  tituloObs,
-}: {
-  informe: InformeEvaluacion | undefined;
-  dictamen: Dictamen;
-  items: string[];
-  observaciones?: string;
-  titulo: string;
-  quien: string;
-  tituloObs: string;
-}) {
-  if (!informe || dictamen === 'PENDIENTE') return <Pendiente quien={quien} />;
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
-        <div>
-          <div className="text-xs font-semibold text-ink">{titulo}</div>
-          <div className="text-[11px] text-muted">
-            {informe.by ? `Emitido por ${informe.by}` : 'Evaluador sin registrar'}
-            {informe.fecha && ` · ${informe.fecha}`}
-          </div>
-        </div>
-        <DictamenBadge value={dictamen} />
-      </div>
-
-      <Section title={tituloObs}>
-        <p
-          className={`rounded-lg border border-border bg-background px-3 py-2.5 text-xs leading-relaxed ${
-            observaciones ? 'text-ink' : 'text-muted italic'
-          }`}
-        >
-          {observaciones || 'Sin observaciones.'}
-        </p>
-      </Section>
-
-      <Section title="Valoración por ítem">
-        <dl className="divide-y divide-border rounded-lg border border-border px-3">
-          {items.map((item, i) => {
-            const v = informe.items[i];
-            return (
-              <div key={item} className="grid grid-cols-1 gap-0.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-3">
-                <dt className="text-[11px] font-medium text-muted">{item}</dt>
-                <dd className={`text-xs leading-relaxed ${v ? 'text-ink' : 'text-muted italic'}`}>{v || 'Sin valorar'}</dd>
-              </div>
-            );
-          })}
-        </dl>
-      </Section>
-    </div>
-  );
-}
-
 /**
  * Visor de dictámenes de una planificación: Informe Disciplinar (Dirección de Carrera)
  * e Informe Pedagógico (UAP). El PAAC se abre desde su propia columna en la bandeja.
  */
-export function InformesModal({ doc, ctx, responsable, acciones, onClose }: InformesModalProps) {
+export function InformesModal({ doc, ctx, responsable, equipo, fullName, acciones, onClose }: InformesModalProps) {
   const disc = dictamenDe(doc.discApproved, doc.discReport);
   const ped = dictamenDe(doc.pedApproved, doc.pedReport);
   const [tab, setTab] = useState<Tab>('disc');
@@ -141,6 +65,7 @@ export function InformesModal({ doc, ctx, responsable, acciones, onClose }: Info
     document.getElementById(`${uid}-tab-${next}`)?.focus();
   };
 
+  const informeTab = tab === 'disc' ? doc.discReport : doc.pedReport;
   const hayAcciones = !!(acciones.onEvaluar || acciones.onElevar || acciones.onFormalizar);
 
   return (
@@ -148,7 +73,7 @@ export function InformesModal({ doc, ctx, responsable, acciones, onClose }: Info
       open
       onClose={onClose}
       title={`Informes de evaluación · ${ctx.asig?.nombre ?? doc.asignaturaId}`}
-      widthClass="max-w-2xl"
+      widthClass="max-w-3xl"
       headerExtra={
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
           <StatusBadge state={doc.state} />
@@ -214,27 +139,16 @@ export function InformesModal({ doc, ctx, responsable, acciones, onClose }: Info
       </div>
 
       <div id={`${uid}-panel-${tab}`} role="tabpanel" aria-labelledby={`${uid}-tab-${tab}`} className="max-h-[60vh] overflow-y-auto pr-1">
-        {tab === 'disc' ? (
-          <InformeArea
-            informe={doc.discReport}
-            dictamen={disc}
-            items={DISCITEMS}
-            observaciones={doc.discReport?.obsDisciplinares}
-            titulo="Informe Disciplinar · Dirección de Carrera (Anexo IV — Ord. 219/22)"
-            tituloObs="Observaciones y resolución de la Dirección"
-            quien="la Dirección de Carrera"
-          />
-        ) : (
-          <InformeArea
-            informe={doc.pedReport}
-            dictamen={ped}
-            items={PEDITEMS}
-            observaciones={doc.pedReport?.obsGenerales}
-            titulo="Informe Pedagógico · UAP (Anexo III — Ord. 219/22)"
-            tituloObs="Sugerencias y observaciones de la UAP"
-            quien="la UAP"
-          />
-        )}
+        <h3 className="mb-3 text-xs font-semibold text-ink">
+          {tab === 'disc' ? 'Informe Disciplinar · Dirección de Carrera (Anexo IV — Ord. 219/22)' : 'Informe Pedagógico · UAP (Anexo III — Ord. 219/22)'}
+          {informeTab?.by && (
+            <span className="block text-[11px] font-normal text-muted">
+              Emitido por {informeTab.by}
+              {informeTab.fecha && ` · ${informeTab.fecha}`}
+            </span>
+          )}
+        </h3>
+        <InformeLectura area={tab === 'disc' ? 'direccion' : 'uap'} d={doc} encabezado={encabezadoInforme(ctx, doc.cycle)} equipo={integrantesEquipo(equipo, fullName)} />
       </div>
     </Modal>
   );

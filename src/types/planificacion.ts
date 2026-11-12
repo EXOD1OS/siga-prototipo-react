@@ -1,6 +1,7 @@
 // Tipos del circuito de planificaciones (PAAC) — ver context/context.md.
 import type { PaadContenido } from './paad';
 import { paacTieneContenido, type PaacContenido } from './paac';
+import type { InformeDisciplinarDatos, InformePedagogicoDatos } from './informes';
 
 export type EstadoPlanif =
   | 'BORRADOR'
@@ -14,7 +15,7 @@ export type EstadoPlanif =
 
 export const ESTADO_LABELS: Record<EstadoPlanif, string> = {
   BORRADOR: 'Borrador',
-  ENVIADO_A_REVISION: 'Presentado · En revisión',
+  ENVIADO_A_REVISION: 'En revisión',
   OBSERVADO: 'Observado',
   APROBADO_PEDAGOGICO: 'Aprob. pedagógico',
   APROBADO_DISCIPLINAR: 'Aprob. disciplinar',
@@ -51,6 +52,10 @@ export interface InformeEvaluacion {
   /** Evaluador que emitió el informe. */
   by?: string;
   fecha?: string;
+  /** Cuadro oficial del Informe Disciplinar (Anexo IV, Ord. 219/22). */
+  disciplinar?: InformeDisciplinarDatos;
+  /** Grilla oficial del Informe Pedagógico (Anexo III, Ord. 219/22). */
+  pedagogico?: InformePedagogicoDatos;
 }
 
 /** Observación anclada a un campo del documento por UAP o Dirección. */
@@ -120,7 +125,10 @@ export function esHistorica(d: Pick<PaacDoc, 'state'>): boolean {
 }
 
 /** Un PAAC está iniciado si tiene algún campo cargado o ya salió de Borrador. */
-export function paacIniciado(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): boolean {
+/** Datos mínimos para saber la etapa del PAAC (sirve para PaacDoc y para DocumentoEditable). */
+export type DatosEtapaPaac = { state: string } & Pick<PaacDoc, 'data' | 'paac'>;
+
+export function paacIniciado(d: DatosEtapaPaac): boolean {
   if (d.state !== 'BORRADOR') return true;
   if (d.paac) return paacTieneContenido(d.paac);
   return Object.values(d.data ?? {}).some((v) => (Array.isArray(v) ? v.length > 0 : !!v && v.trim() !== ''));
@@ -129,7 +137,7 @@ export function paacIniciado(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): boole
 /** Etapa de elaboración del documento PAAC (para la columna PAAC de la bandeja). */
 export type EtapaPaac = 'SIN_INICIAR' | 'EN_ELABORACION' | 'EN_CORRECCION' | 'PRESENTADO';
 
-export function etapaPaac(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): EtapaPaac {
+export function etapaPaac(d: DatosEtapaPaac): EtapaPaac {
   if (!paacIniciado(d)) return 'SIN_INICIAR';
   if (d.state === 'BORRADOR') return 'EN_ELABORACION';
   if (d.state === 'OBSERVADO') return 'EN_CORRECCION';
@@ -139,7 +147,7 @@ export function etapaPaac(d: Pick<PaacDoc, 'state' | 'data' | 'paac'>): EtapaPaa
 export const ETAPA_PAAC: Record<EtapaPaac, { label: string; cls: string }> = {
   SIN_INICIAR: { label: 'Sin iniciar', cls: 'text-muted' },
   EN_ELABORACION: { label: 'En elaboración', cls: 'text-amber-700 dark:text-amber-400' },
-  EN_CORRECCION: { label: 'En corrección', cls: 'text-red-700 dark:text-red-400' },
+  EN_CORRECCION: { label: 'Correcciones', cls: 'text-amber-700 dark:text-amber-400' },
   PRESENTADO: { label: 'Presentado', cls: 'text-emerald-700 dark:text-emerald-400' },
 };
 
@@ -155,7 +163,7 @@ export const DICTAMEN_LABELS: Record<Dictamen, string> = {
   PENDIENTE: 'Pendiente',
   FAVORABLE: 'Favorable',
   CON_OBSERVACIONES: 'Con observaciones',
-  REEVALUACION: 'Pendiente de re-evaluación',
+  REEVALUACION: 'En revisión',
 };
 
 export const DICTAMEN_BADGE: Record<Dictamen, string> = {

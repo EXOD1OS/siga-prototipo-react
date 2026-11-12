@@ -13,6 +13,7 @@ import { ReportEvaluationView } from './components/views/ReportEvaluationView';
 import { AdminEstructuraView } from './components/views/AdminEstructuraView';
 import { AdminUsuariosView } from './components/views/AdminUsuariosView';
 import type { InfoRevision } from './components/shared/PanelRevision';
+import type { InformeEvaluacion } from './types/planificacion';
 import {
   areaDeRol,
   esEditablePorDocente,
@@ -176,14 +177,14 @@ export default function App() {
   };
 
   /** UAP / Dirección cierran su revisión: devuelven al docente o emiten dictamen favorable. */
-  const finalizarRevisionDoc = (docId: string, resultado: ResultadoRevision) => {
+  const finalizarRevisionDoc = (docId: string, resultado: ResultadoRevision, datosInforme?: Partial<InformeEvaluacion>) => {
     const area = areaDeRol(role);
     const doc = docBy(docId);
     if (!area || !doc) return;
     const { doc: next, error } = finalizarRevision(doc, area, resultado, {
       autor: activeUserName,
       fecha: new Date().toLocaleDateString('es-AR'),
-    });
+    }, datosInforme);
     if (error) {
       showToast(error, 'warning');
       return;
@@ -204,7 +205,20 @@ export default function App() {
   const revisionPara = (d: any): InfoRevision | null => {
     const area = areaDeRol(role);
     if (!d || !area || !canObserveDoc(d)) return null;
-    return { area, pendientes: observacionesPendientesDe(d, area), onFinalizar: (r) => finalizarRevisionDoc(d.id, r) };
+    return {
+      area,
+      pendientes: observacionesPendientesDe(d, area),
+      onFinalizar: (r, datos) => finalizarRevisionDoc(d.id, r, datos),
+      // PAAC: el dictamen favorable pasa por el informe oficial (Anexo III / IV) autocompletado.
+      onAbrirInforme:
+        d.type === 'PAAC'
+          ? () => {
+              setModalPaadId(null);
+              setActiveDocId(d.id);
+              setPage('report');
+            }
+          : undefined,
+    };
   };
 
   const paacs = S.docs.filter((d) => d.type === 'PAAC');
@@ -387,15 +401,15 @@ export default function App() {
               onSubmitDoc={() => {
                 const reenvio = esReenvio(currentDoc);
                 updateActiveDoc((doc) => ({
-                  // Guarda las correcciones y vuelve a revisión; los dictámenes observados quedan "Pendiente de re-evaluación".
+                  // Guarda las correcciones y vuelve a revisión; los dictámenes observados vuelven a "En revisión".
                   ...presentarDocumento(doc),
                   sinGuardar: false,
                   guardadoEn: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
                 }));
                 showToast(
                   reenvio
-                    ? `${currentDoc.type} subsanado y presentado nuevamente: queda pendiente de re-evaluación.`
-                    : `${currentDoc.type} presentado: enviado a revisión de UAP y Dirección.`
+                    ? `${currentDoc.type} subsanado y presentado nuevamente: queda en revisión.`
+                    : `${currentDoc.type} presentado: queda en revisión de UAP y Dirección.`
                 );
               }}
               revision={revisionPara(currentDoc)}
@@ -415,6 +429,13 @@ export default function App() {
                   return doc;
                 })
               }
+              onDeleteObs={(obsId: string) => {
+                updateActiveDoc((doc) => {
+                  doc.comments = doc.comments.filter((x: any) => x.id !== obsId);
+                  return doc;
+                });
+                showToast('Observación eliminada.');
+              }}
               onResolveObs={(obsId: string) =>
                 updateActiveDoc((doc) => {
                   const o = doc.comments.find((x: any) => x.id === obsId);
@@ -432,32 +453,17 @@ export default function App() {
 
           {page === 'report' && currentDoc && (
             <ReportEvaluationView
+              key={`${currentDoc.id}-${role}-${careerId}`}
               d={currentDoc}
               asigContext={asigContext}
+              equipo={equipoDeAsig(currentDoc.asignaturaId)}
+              docs={S.docs}
+              fullName={fullName}
               revision={revisionPara(currentDoc)}
-              onUpdateObs={(area, texto) =>
-                updateActiveDoc((doc) => {
-                  if (area === 'uap') doc.pedReport.obsGenerales = texto;
-                  else doc.discReport.obsDisciplinares = texto;
-                  return doc;
-                })
-              }
               onBackToDoc={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
               }}
-              onUpdatePedItem={(idx: number, val: string) =>
-                updateActiveDoc((doc) => {
-                  doc.pedReport.items[idx] = val;
-                  return doc;
-                })
-              }
-              onUpdateDiscItem={(idx: number, val: string) =>
-                updateActiveDoc((doc) => {
-                  doc.discReport.items[idx] = val;
-                  return doc;
-                })
-              }
             />
           )}
 
