@@ -1,7 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { Modal, ModalButton } from '../shared/Modal';
 import { StatusBadge } from '../shared/StatusBadge';
-import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
 import { InformeLectura } from '../informes/InformeLectura';
 import { encabezadoInforme, integrantesEquipo, type DocPaadResumen } from '../../lib/informes';
 import {
@@ -23,13 +22,13 @@ import {
   type PaacDoc,
 } from '../../types/planificacion';
 
-/** Acciones del circuito disponibles para la sesión actual (null = no corresponde). */
+/**
+ * Acciones del circuito posteriores a los informes (null = no corresponde).
+ * Los informes no se emiten ni se aprueban desde aquí: solo entrando al PAAC.
+ */
 export interface AccionesInforme {
-  onEvaluar: (() => void) | null;
   onElevar: (() => void) | null;
   onFormalizar: (() => void) | null;
-  /** Cierre de revisión de la UAP o la Dirección. */
-  revision: InfoRevision | null;
 }
 
 interface InformesModalProps {
@@ -47,9 +46,19 @@ interface InformesModalProps {
 
 type ViewMode = 'digital' | 'pdf';
 
-const TABS: { key: TipoInforme; label: string; titulo: string }[] = [
-  { key: 'pedagogico', label: 'Informe Pedagógico (UAP)', titulo: 'Informe Pedagógico · UAP (Anexo III — Ord. 219/22)' },
-  { key: 'disciplinar', label: 'Informe Disciplinar (Dirección)', titulo: 'Informe Disciplinar · Dirección de Carrera (Anexo IV — Ord. 219/22)' },
+const TABS: { key: TipoInforme; label: string; titulo: string; sinEmitir: string }[] = [
+  {
+    key: 'pedagogico',
+    label: 'Informe Pedagógico (UAP)',
+    titulo: 'Informe Pedagógico · UAP (Anexo III — Ord. 219/22)',
+    sinEmitir: 'Informe Pedagógico aún no emitido por la UAP',
+  },
+  {
+    key: 'disciplinar',
+    label: 'Informe Disciplinar (Dirección)',
+    titulo: 'Informe Disciplinar · Dirección de Carrera (Anexo IV — Ord. 219/22)',
+    sinEmitir: 'Informe Disciplinar aún no emitido por la Dirección de Carrera',
+  },
 ];
 
 function DictamenBadge({ value }: { value: Dictamen }) {
@@ -61,11 +70,13 @@ function DictamenBadge({ value }: { value: Dictamen }) {
 }
 
 /**
- * Visor de dictámenes de una planificación: Informe Pedagógico (UAP) e Informe Disciplinar (Dirección).
- * En el mismo modal se alterna entre la vista digital y la hoja oficial A4 (PDF) del informe presentado.
+ * Consulta de los informes emitidos de una planificación: Informe Pedagógico (UAP) e Informe Disciplinar (Dirección).
+ * Es solo lectura: un informe sin emitir muestra un aviso y nunca formularios ni botones de aprobación.
+ * En el mismo modal se alterna entre la vista digital y la hoja oficial A4 (PDF) del informe emitido.
  */
 export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, acciones, onClose }: InformesModalProps) {
-  const [activeTab, setActiveTab] = useState<TipoInforme>('pedagogico');
+  // Abre en el primer informe emitido.
+  const [activeTab, setActiveTab] = useState<TipoInforme>(() => (!doc.pedApproved && doc.discApproved ? 'disciplinar' : 'pedagogico'));
   const [viewMode, setViewMode] = useState<ViewMode>('digital');
   const uid = useId();
 
@@ -74,7 +85,7 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
   const modo: ViewMode = presentado ? viewMode : 'digital';
   const informe = activeTab === 'disciplinar' ? doc.discReport : doc.pedReport;
   const fuente: FuenteHojaInforme = { d: doc, ctx, equipo, docs, fullName };
-  const titulo = TABS.find((t) => t.key === activeTab)?.titulo ?? '';
+  const tabActiva = TABS.find((t) => t.key === activeTab) ?? TABS[0];
 
   const cambiarTab = (t: TipoInforme) => {
     setActiveTab(t);
@@ -88,7 +99,7 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
     document.getElementById(`${uid}-tab-${next}`)?.focus();
   };
 
-  const hayAcciones = !!(acciones.onEvaluar || acciones.onElevar || acciones.onFormalizar);
+  const hayAcciones = !!(acciones.onElevar || acciones.onFormalizar);
 
   return (
     <Modal
@@ -108,11 +119,7 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
         <>
           {hayAcciones && (
             <span className="mr-auto flex flex-wrap gap-2">
-              {acciones.onEvaluar && (
-                <ModalButton variant="primary" onClick={acciones.onEvaluar}>
-                  Emitir / editar informe
-                </ModalButton>
-              )}
+
               {acciones.onElevar && (
                 <ModalButton variant="primary" onClick={acciones.onElevar}>
                   Elevar al Consejo
@@ -129,11 +136,6 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
         </>
       }
     >
-      {acciones.revision && modo === 'digital' && (
-        <div className="mb-4">
-          <PanelRevision revision={acciones.revision} tipo="PAAC" />
-        </div>
-      )}
 
       <div className="-mt-1 mb-4 flex flex-col gap-2 border-b border-border sm:flex-row sm:items-end sm:justify-between">
         <div role="tablist" aria-label="Informes de la planificación" className="flex gap-1 overflow-x-auto">
@@ -181,10 +183,15 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
       </div>
 
       <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${activeTab}`} className="max-h-[60vh] overflow-y-auto pr-1">
-        {modo === 'digital' && (
+        {!presentado ? (
+          <div className="rounded-xl border border-dashed border-border bg-background px-4 py-10 text-center">
+            <p className="text-sm font-medium text-ink">{tabActiva.sinEmitir}</p>
+            <p className="mt-1 text-xs text-muted">Se podrá consultar aquí cuando su dictamen favorable quede emitido desde el PAAC.</p>
+          </div>
+        ) : modo === 'digital' && (
           <>
             <h3 className="mb-3 text-xs font-semibold text-ink">
-              {titulo}
+              {tabActiva.titulo}
               {informe?.by && (
                 <span className="block text-[11px] font-normal text-muted">
                   Emitido por {informe.by}

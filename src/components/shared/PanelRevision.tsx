@@ -8,8 +8,8 @@ export interface InfoRevision {
   area: AreaRevision;
   /** Observaciones de esta área que el docente todavía no subsanó. */
   pendientes: number;
-  /** Registra el dictamen; `datos` es el contenido del informe que se guarda con él. */
-  onFinalizar: (r: ResultadoRevision, datos?: Partial<InformeEvaluacion>) => void;
+  /** Registra el dictamen; `datos` es el contenido del informe. Devuelve false si no se pudo registrar. */
+  onFinalizar: (r: ResultadoRevision, datos?: Partial<InformeEvaluacion>) => boolean | void;
   /**
    * PAAC: el dictamen favorable no se emite en seco. Abre el informe oficial autocompletado
    * (Disciplinar o Pedagógico) para revisarlo y confirmarlo.

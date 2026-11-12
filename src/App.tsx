@@ -227,17 +227,18 @@ export default function App() {
   };
 
   /** UAP / Dirección cierran su revisión: devuelven al docente o emiten dictamen favorable. */
-  const finalizarRevisionDoc = (docId: string, resultado: ResultadoRevision, datosInforme?: Partial<InformeEvaluacion>) => {
+  /** Devuelve true si el dictamen quedó registrado. */
+  const finalizarRevisionDoc = (docId: string, resultado: ResultadoRevision, datosInforme?: Partial<InformeEvaluacion>): boolean => {
     const area = areaDeRol(role);
     const doc = docBy(docId);
-    if (!area || !doc) return;
+    if (!area || !doc) return false;
     const { doc: next, error } = finalizarRevision(doc, area, resultado, {
       autor: activeUserName,
       fecha: new Date().toLocaleDateString('es-AR'),
     }, datosInforme);
     if (error) {
       showToast(error, 'warning');
-      return;
+      return false;
     }
     setS((prev) => ({ ...prev, docs: prev.docs.map((x) => (x.id === docId ? next : x)) }));
     const quien = area === 'uap' ? 'pedagógico (UAP)' : 'disciplinar (Dirección)';
@@ -251,6 +252,7 @@ export default function App() {
             : `Dictamen ${quien} favorable registrado.`,
       resultado === 'OBSERVADO' ? 'warning' : 'success'
     );
+    return true;
   };
 
   /** Datos del panel de decisión si la sesión puede revisar el documento. */
@@ -343,10 +345,6 @@ export default function App() {
                 setActiveDocId(id);
                 setPage('doc');
               }}
-              onOpenReport={(id: string) => {
-                setActiveDocId(id);
-                setPage('report');
-              }}
               onElevarPaac={(id: string) =>
                 setS((prev) => ({
                   ...prev,
@@ -365,7 +363,6 @@ export default function App() {
                 setActiveDocId(id);
                 setPage('doc');
               }}
-              onFinalizarRevision={finalizarRevisionDoc}
               docs={S.docs}
             />
           )}
@@ -500,6 +497,7 @@ export default function App() {
               docs={S.docs}
               fullName={fullName}
               revision={revisionPara(currentDoc)}
+              areaSesion={areaDeRol(role)}
               onBackToDoc={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');

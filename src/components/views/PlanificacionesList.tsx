@@ -3,7 +3,6 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
 import type { DocPaadResumen } from '../../lib/informes';
 import { ROLES_DEPARTAMENTALES, esSesionDocente, puedeVerPlanificacion } from '../../lib/visibilidad';
-import { areaDeRol, ESTADOS_EN_REVISION, observacionesPendientesDe, type ResultadoRevision } from '../../lib/revision';
 import type { AsigContext, Carrera, EquipoCatedra } from '../../types/estructura';
 import {
   DICTAMEN_BADGE,
@@ -35,12 +34,9 @@ interface PlanificacionesListProps {
   puedeEditar: (d: PaacDoc) => boolean;
   /** Abre el editor / visor del PAAC. */
   onOpenDoc: (id: string) => void;
-  onOpenReport: (id: string) => void;
   onElevarPaac: (id: string) => void;
   onOpenFormalizarModal: (id: string) => void;
   onViewFinal: (id: string) => void;
-  /** Cierra la revisión de la sesión (UAP o Dirección) sobre un PAAC. */
-  onFinalizarRevision: (id: string, resultado: ResultadoRevision) => void;
   /** Documentos del sistema (PAAD del equipo, para la hoja oficial de los informes). */
   docs: DocPaadResumen[];
 }
@@ -134,11 +130,9 @@ export function PlanificacionesList({
   fullName,
   puedeEditar,
   onOpenDoc,
-  onOpenReport,
   onElevarPaac,
   onOpenFormalizarModal,
   onViewFinal,
-  onFinalizarRevision,
   docs,
 }: PlanificacionesListProps) {
   const esDireccion = role === 'DIRECCION_CARRERA';
@@ -222,28 +216,13 @@ export function PlanificacionesList({
 
   // ---- Modal de informes ----
   const docInformes = informesId ? visibles.find((d) => d.id === informesId) : undefined;
+  // El modal de informes es solo de consulta: los informes se emiten entrando al PAAC.
   const accionesPara = (d: PaacDoc): AccionesInforme => {
-    const ctx = asigContext(d.asignaturaId);
-    const enRevision = ESTADOS_EN_REVISION.includes(d.state);
-    const puedeEvaluar =
-      enRevision && ((role === 'UAP' && !d.pedApproved) || (esDireccion && ctx.carrera?.id === careerId && !d.discApproved));
     const cerrarY = (fn: (id: string) => void) => () => {
       setInformesId(null);
       fn(d.id);
     };
-    const area = areaDeRol(role);
     return {
-      revision:
-        puedeEvaluar && area
-          ? {
-              area,
-              pendientes: observacionesPendientesDe(d, area),
-              onFinalizar: (r) => onFinalizarRevision(d.id, r),
-              // El dictamen favorable se emite desde el informe oficial autocompletado.
-              onAbrirInforme: cerrarY(onOpenReport),
-            }
-          : null,
-      onEvaluar: puedeEvaluar ? cerrarY(onOpenReport) : null,
       onElevar: esDireccion && d.state === 'APROBADO_PLENO' ? cerrarY(onElevarPaac) : null,
       onFormalizar:
         role === 'CONSEJO_DEPARTAMENTAL' && ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'].includes(d.state)
@@ -453,11 +432,16 @@ export function PlanificacionesList({
                       )}
                     </td>
                     <td className="px-3 py-3 pr-4 text-right sm:pr-5">
+                      {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
                       <button
                         type="button"
                         onClick={() => setInformesId(d.id)}
-                        aria-label={`Ver informes de ${ctx.asig?.nombre}`}
-                        className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-primary hover:bg-primary hover:text-white hover:border-primary text-[11px] font-semibold transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                        disabled={!d.pedApproved && !d.discApproved}
+                        aria-label={
+                          d.pedApproved || d.discApproved ? `Ver informes de ${ctx.asig?.nombre}` : `${ctx.asig?.nombre}: aún no hay informes emitidos`
+                        }
+                        title={d.pedApproved || d.discApproved ? undefined : 'Aún no hay informes emitidos'}
+                        className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-primary hover:bg-primary hover:text-white hover:border-primary text-[11px] font-semibold transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-primary disabled:hover:border-border"
                       >
                         Informes
                       </button>
