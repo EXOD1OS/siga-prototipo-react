@@ -350,7 +350,7 @@ export function InformePedagogicoForm({
       </div>
     );
   };
-  const texto = (k: 'objetivos' | 'clase' | 'contenidos' | 'tp' | 'tpLab' | 'tpCampo' | 'evaluacion' | 'regimen', etiqueta: string, sugerencias?: readonly string[]) => (
+  const texto = (k: 'objetivos' | 'clase' | 'recursos' | 'contenidos' | 'tp' | 'tpLab' | 'tpCampo' | 'evaluacion' | 'regimen', etiqueta: string, sugerencias?: readonly string[]) => (
     <TextoSugerido id={`${uid}-${k}`} etiqueta={etiqueta} value={datos[k]} sugerencias={sugerencias} readOnly={readOnly} onChange={(v) => set(k, v)} />
   );
   const presenta = (k: 'horarios' | 'distribucion', etiqueta: string) => (
@@ -364,7 +364,8 @@ export function InformePedagogicoForm({
         ['Introducción', valorado('introduccion', 'Introducción')],
         ['Diagnóstico', valorado('diagnostico', 'Diagnóstico')],
         ['Objetivos / Propósito / RA', texto('objetivos', 'Objetivos, propósito y resultados de aprendizaje', SUGERENCIAS_PED.objetivos)],
-        ['Clase / Recursos didácticos', texto('clase', 'Clase y recursos didácticos', SUGERENCIAS_PED.clase)],
+        ['Clase', texto('clase', 'Clase', SUGERENCIAS_PED.clase)],
+        ['Recursos Didácticos', texto('recursos', 'Recursos didácticos', SUGERENCIAS_PED.recursos)],
       ],
     },
     {

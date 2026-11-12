@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
+import type { DocPaadResumen } from '../../lib/informes';
 import { ROLES_DEPARTAMENTALES, esSesionDocente, puedeVerPlanificacion } from '../../lib/visibilidad';
 import { areaDeRol, ESTADOS_EN_REVISION, observacionesPendientesDe, type ResultadoRevision } from '../../lib/revision';
 import type { AsigContext, Carrera, EquipoCatedra } from '../../types/estructura';
@@ -40,6 +41,8 @@ interface PlanificacionesListProps {
   onViewFinal: (id: string) => void;
   /** Cierra la revisión de la sesión (UAP o Dirección) sobre un PAAC. */
   onFinalizarRevision: (id: string, resultado: ResultadoRevision) => void;
+  /** Documentos del sistema (PAAD del equipo, para la hoja oficial de los informes). */
+  docs: DocPaadResumen[];
 }
 
 type Vista = 'activas' | 'historicas';
@@ -136,6 +139,7 @@ export function PlanificacionesList({
   onOpenFormalizarModal,
   onViewFinal,
   onFinalizarRevision,
+  docs,
 }: PlanificacionesListProps) {
   const esDireccion = role === 'DIRECCION_CARRERA';
   const [vista, setVista] = useState<Vista>('activas');
@@ -510,6 +514,7 @@ export function PlanificacionesList({
           responsable={fullName(docInformes.owner)}
           equipo={equiposCatedra.filter((e) => e.asignaturaId === docInformes.asignaturaId && e.cicloLectivo === cycle)}
           fullName={fullName}
+          docs={docs}
           acciones={accionesPara(docInformes)}
           onClose={() => setInformesId(null)}
         />

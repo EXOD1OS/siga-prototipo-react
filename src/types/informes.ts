@@ -15,6 +15,7 @@ export const SUGERENCIAS_PED = {
     'Presenta la metodología sin detallar los recursos didácticos',
     'No presenta',
   ],
+  recursos: ['Presenta recursos didácticos acordes a las estrategias', 'Recursos didácticos a precisar', 'No presenta'],
   tp: ['Articulados con la teoría', 'Parcialmente articulados con la teoría', 'No corresponde'],
   evaluacion: [
     'Formativa y Sumativa. Criterios claros. Técnicas de evaluación apropiadas',
@@ -54,6 +55,7 @@ export interface InformePedagogicoDatos {
   diagnostico: ItemValorado;
   objetivos: string;
   clase: string;
+  recursos: string;
   // B) Aspectos curriculares
   contenidos: string;
   tp: string;

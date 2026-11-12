@@ -331,6 +331,7 @@ export default function App() {
                 setPage('doc');
               }}
               onFinalizarRevision={finalizarRevisionDoc}
+              docs={S.docs}
             />
           )}
 

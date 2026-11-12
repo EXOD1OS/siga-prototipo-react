@@ -1,10 +1,21 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
 import { AvisoEstado } from '../shared/AvisoEstado';
 import { btnAprobar, btnObservar, btnSecundario, type InfoRevision } from '../shared/PanelRevision';
 import { InformeDisciplinarForm, InformePedagogicoForm } from '../informes/InformesOficiales';
 import { InformeLectura } from '../informes/InformeLectura';
 import { IconCheck, IconRefresh, IconReturn } from '../layout/icons';
+import {
+  BTN_DESCARGAR_PDF,
+  BTN_VER_PDF,
+  BTN_VOLVER_DIGITAL,
+  HojaOficial,
+  TITULO_INFORME,
+  imprimirInforme,
+  informePresentado,
+  type FuenteHojaInforme,
+  type TipoInforme,
+} from '../informes/HojasInformeOficial';
 import { dictamenDe, DICTAMEN_BADGE, DICTAMEN_LABELS, type InformeEvaluacion, type PaacDoc } from '../../types/planificacion';
 import type { AsigContext, EquipoCatedra } from '../../types/estructura';
 import type { InformeDisciplinarDatos, InformePedagogicoDatos } from '../../types/informes';
@@ -36,7 +47,11 @@ const META: Record<AreaRevision, { titulo: string; tono: string; informe: 'pedRe
   uap: { titulo: 'Informe Pedagógico · UAP', tono: 'text-amber-700 dark:text-amber-400', informe: 'pedReport', aprobado: 'pedApproved' },
 };
 
-function Encabezado({ area, d }: { area: AreaRevision; d: PaacDoc }) {
+const TIPO_DE_AREA: Record<AreaRevision, TipoInforme> = { direccion: 'disciplinar', uap: 'pedagogico' };
+
+type Vista = 'formulario' | 'pdf';
+
+function Encabezado({ area, d, acciones }: { area: AreaRevision; d: PaacDoc; acciones?: ReactNode }) {
   const m = META[area];
   const informe = d[m.informe];
   const dictamen = dictamenDe(d[m.aprobado], informe);
@@ -51,7 +66,10 @@ function Encabezado({ area, d }: { area: AreaRevision; d: PaacDoc }) {
           </p>
         )}
       </div>
-      <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${DICTAMEN_BADGE[dictamen]}`}>{DICTAMEN_LABELS[dictamen]}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        {acciones}
+        <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${DICTAMEN_BADGE[dictamen]}`}>{DICTAMEN_LABELS[dictamen]}</span>
+      </div>
     </div>
   );
 }
@@ -95,6 +113,58 @@ export function ReportEvaluationView({ d, asigContext, equipo, docs, fullName, r
   const puedeObservar = pendientes > 0 || obs.trim() !== '';
   const otraArea: AreaRevision = area === 'uap' ? 'direccion' : 'uap';
 
+  // ---- Documento oficial (PDF) de los informes ya presentados ----
+  const fuente: FuenteHojaInforme = { d, ctx, equipo, docs, fullName };
+  const presentados = (['disciplinar', 'pedagogico'] as const).filter((t) => informePresentado(d, t));
+  const [vista, setVista] = useState<Vista>('formulario');
+  const [tipoPdf, setTipoPdf] = useState<TipoInforme>(presentados[0] ?? 'disciplinar');
+  const [imprimir, setImprimir] = useState(false);
+  const uidTabs = useId();
+  const vistaActiva: Vista = presentados.length ? vista : 'formulario';
+  const tipoActivo: TipoInforme = informePresentado(d, tipoPdf) ? tipoPdf : (presentados[0] ?? 'disciplinar');
+
+  // «Descargar PDF» desde una tarjeta: primero se monta la hoja de ese informe y después se imprime.
+  useEffect(() => {
+    if (!imprimir) return;
+    setImprimir(false);
+    imprimirInforme();
+  }, [imprimir]);
+
+  const verPdf = (tipo: TipoInforme) => {
+    setTipoPdf(tipo);
+    setVista('pdf');
+  };
+  const descargarPdf = (tipo: TipoInforme) => {
+    setTipoPdf(tipo);
+    setImprimir(true);
+  };
+
+  const accionesPdf = (a: AreaRevision) => {
+    const tipo = TIPO_DE_AREA[a];
+    if (!informePresentado(d, tipo)) return null;
+    return (
+      <>
+        <button type="button" onClick={() => verPdf(tipo)} className={BTN_VER_PDF}>
+          Ver PDF
+        </button>
+        <button type="button" onClick={() => descargarPdf(tipo)} title="Abre la impresión de la hoja oficial: elegí «Guardar como PDF»" className={BTN_DESCARGAR_PDF}>
+          Descargar PDF
+        </button>
+      </>
+    );
+  };
+
+  const vistas: { key: Vista; label: string }[] = [
+    { key: 'formulario', label: 'Formulario de Evaluación' },
+    { key: 'pdf', label: 'Vista Previa Documento Oficial (PDF)' },
+  ];
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const next: Vista = vistaActiva === 'formulario' ? 'pdf' : 'formulario';
+    setVista(next);
+    document.getElementById(`${uidTabs}-tab-${next}`)?.focus();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
@@ -111,7 +181,67 @@ export function ReportEvaluationView({ d, asigContext, equipo, docs, fullName, r
         </button>
       </div>
 
-      {revision && area ? (
+      {presentados.length > 0 && (
+        <div role="tablist" aria-label="Vista de los informes" className="flex gap-1 overflow-x-auto border-b border-border">
+          {vistas.map((v) => {
+            const activo = vistaActiva === v.key;
+            return (
+              <button
+                key={v.key}
+                id={`${uidTabs}-tab-${v.key}`}
+                type="button"
+                role="tab"
+                aria-selected={activo}
+                aria-controls={`${uidTabs}-panel`}
+                tabIndex={activo ? 0 : -1}
+                onClick={() => setVista(v.key)}
+                onKeyDown={onTabKey}
+                className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
+                  activo ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-ink'
+                }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div id={`${uidTabs}-panel`} role={presentados.length ? 'tabpanel' : undefined} aria-labelledby={presentados.length ? `${uidTabs}-tab-${vistaActiva}` : undefined} className="space-y-6">
+      {vistaActiva === 'pdf' ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div role="radiogroup" aria-label="Informe a previsualizar" className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
+            {(['pedagogico', 'disciplinar'] as const).map((t) => {
+              const habilitado = informePresentado(d, t);
+              const activo = t === tipoActivo;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={activo}
+                  disabled={!habilitado}
+                  title={habilitado ? undefined : `El ${TITULO_INFORME[t]} todavía no fue presentado`}
+                  onClick={() => setTipoPdf(t)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
+                    activo ? 'bg-primary text-white' : 'text-muted hover:bg-background hover:text-ink'
+                  }`}
+                >
+                  {TITULO_INFORME[t]}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setVista('formulario')} className={BTN_VOLVER_DIGITAL}>
+              ← Volver a vista digital
+            </button>
+            <button type="button" onClick={imprimirInforme} title="Abre la impresión de la hoja oficial: elegí «Guardar como PDF»" className={BTN_DESCARGAR_PDF}>
+              Descargar PDF
+            </button>
+          </div>
+        </div>
+      ) : revision && area ? (
         <>
           <AvisoEstado tono="revision" titulo={`Informe ${area === 'uap' ? 'Pedagógico' : 'Disciplinar'} autocompletado desde el PAAC.`}>
             Revisá los valores sugeridos y modificá cualquier selector o texto antes de confirmar. El dictamen favorable queda firme recién al presionar
@@ -170,7 +300,7 @@ export function ReportEvaluationView({ d, asigContext, equipo, docs, fullName, r
           </section>
 
           <section className="space-y-4 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6">
-            <Encabezado area={otraArea} d={d} />
+            <Encabezado area={otraArea} d={d} acciones={accionesPdf(otraArea)} />
             <InformeLectura area={otraArea} d={d} encabezado={encabezado} equipo={integrantes} />
           </section>
         </>
@@ -187,12 +317,14 @@ export function ReportEvaluationView({ d, asigContext, equipo, docs, fullName, r
           )}
           {(['direccion', 'uap'] as const).map((a) => (
             <section key={a} className="space-y-4 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6">
-              <Encabezado area={a} d={d} />
+              <Encabezado area={a} d={d} acciones={accionesPdf(a)} />
               <InformeLectura area={a} d={d} encabezado={encabezado} equipo={integrantes} />
             </section>
           ))}
         </>
       )}
+      {presentados.length > 0 && <HojaOficial tipo={tipoActivo} fuente={fuente} visible={vistaActiva === 'pdf'} />}
+      </div>
     </div>
   );
 }

@@ -138,11 +138,9 @@ export function sugerirInformePedagogico(d: FuenteInforme): InformePedagogicoDat
     introduccion,
     diagnostico,
     objetivos: hayObjetivos ? 'Concretos y claros' : 'No presenta',
-    clase: metodo && recursos
-      ? 'Presenta y describe la metodología del proceso de enseñanza'
-      : metodo
-        ? 'Presenta la metodología sin detallar los recursos didácticos'
-        : 'No presenta',
+    clase: metodo ? 'Presenta y describe la metodología del proceso de enseñanza' : 'No presenta',
+    // Los recursos se toman de la propuesta por competencia (estrategias y actividades).
+    recursos: recursos ? 'Presenta recursos didácticos acordes a las estrategias' : metodo ? 'Recursos didácticos a precisar' : 'No presenta',
     contenidos: `Desarrollados en ${c.unidades.length} unidades`,
     tp: hayTps ? 'Articulados con la teoría' : 'No presenta',
     tpLab: preveLaboratorio(d, c) ? 'Articulados con la teoría' : 'No corresponde',
