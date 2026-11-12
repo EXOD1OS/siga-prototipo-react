@@ -40,6 +40,8 @@ interface Props {
   notifications: NotificationItem[];
   onSelectNotification: (docId: string) => void;
   onNavigate: (page: string) => void;
+  /** Abre el modal de cambio de contraseña sin salir de la vista actual. */
+  onOpenPasswordModal: () => void;
   onLogout: () => void;
 }
 
@@ -94,6 +96,7 @@ export function Header({
   notifications,
   onSelectNotification,
   onNavigate,
+  onOpenPasswordModal,
   onLogout,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -327,7 +330,7 @@ export function Header({
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
-                onNavigate('cambiar-password');
+                onOpenPasswordModal();
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-ink transition-colors hover:bg-soft hover:text-primary"
             >

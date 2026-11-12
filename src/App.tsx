@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { createInitialData, reemplazarCatedrasDeUsuario, usuariosConCatedras } from './data/mockData';
+import { createInitialData, reemplazarCatedrasDeUsuario, ROLES, usuariosConCatedras } from './data/mockData';
 import { Header, type NotificationItem } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PaadModal } from './components/shared/PaadModal';
@@ -10,6 +10,9 @@ import { PlanificacionesList } from './components/views/PlanificacionesList';
 import { PaadsListView } from './components/views/PaadsListView';
 import { DocumentFormView } from './components/views/DocumentFormView';
 import { ReportEvaluationView } from './components/views/ReportEvaluationView';
+import { LoginView } from './components/views/LoginView';
+import { CambiarPasswordModal } from './components/shared/CambiarPasswordModal';
+import type { Usuario } from './types/estructura';
 import { AdminEstructuraView } from './components/views/AdminEstructuraView';
 import { AdminUsuariosView } from './components/views/AdminUsuariosView';
 import type { InfoRevision } from './components/shared/PanelRevision';
@@ -35,6 +38,7 @@ export default function App() {
   const [activeDocId, setActiveDocId] = useState('paac-1');
   const [modalPaadId, setModalPaadId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string; tone: ToastTone } | null>(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -124,6 +128,41 @@ export default function App() {
         };
       });
   }, [S, role, uid]);
+
+  /** Cuenta de usuario detrás de la sesión simulada (para el cambio de contraseña). */
+  const usuarioSesionId = (): string | null => {
+    if (role.startsWith('DOCENTE')) return uid;
+    if (role === 'DIRECCION_CARRERA') return carreraBy(careerId)?.directorId ?? null;
+    const rolCuenta: Record<string, Usuario['rol']> = { UAP: 'UAP', CONSEJO_DEPARTAMENTAL: 'Consejo', ADMINISTRADOR: 'Administrador' };
+    return S.usuarios.find((u) => u.rol === rolCuenta[role])?.id ?? null;
+  };
+  const debeCambiarPassword = !!S.usuarios.find((u) => u.id === usuarioSesionId())?.mustChangePassword;
+
+  /** Arma la sesión a partir de la cuenta que ingresó en el Login. */
+  const iniciarSesion = (u: Usuario) => {
+    let nuevoRol: string;
+    if (u.rol === 'Docente') {
+      const responsable = S.equiposCatedra.some((e) => e.docenteId === u.id && e.cicloLectivo === S.cycle && e.esResponsable);
+      nuevoRol = responsable ? 'DOCENTE_RESPONSABLE' : 'DOCENTE_AUXILIAR';
+      setUid(u.id);
+    } else if (u.rol === 'Director') {
+      nuevoRol = 'DIRECCION_CARRERA';
+      if (u.carreraId) setCareerId(u.carreraId);
+    } else {
+      nuevoRol = { UAP: 'UAP', Consejo: 'CONSEJO_DEPARTAMENTAL', Administrador: 'ADMINISTRADOR' }[u.rol];
+    }
+    handleRoleChange(nuevoRol);
+    showToast(`Bienvenido/a, ${u.nombre} ${u.apellido}`);
+    // Con la contraseña provisoria (DNI) se pide definir una personal al entrar.
+    if (u.mustChangePassword) setPasswordModalOpen(true);
+  };
+
+  const actualizarPassword = () => {
+    const id = usuarioSesionId();
+    setS((prev) => ({ ...prev, usuarios: prev.usuarios.map((u) => (u.id === id ? { ...u, mustChangePassword: false } : u)) }));
+    setPasswordModalOpen(false);
+    showToast('Contraseña actualizada correctamente.');
+  };
 
   const handleRoleChange = (newRole: string) => {
     setRole(newRole);
@@ -226,72 +265,55 @@ export default function App() {
   const currentDoc = docBy(activeDocId);
   const modalPaad = modalPaadId ? docBy(modalPaadId) : null;
 
+  const toastEl = toast && <Toast key={toast.id} message={toast.msg} tone={toast.tone} onDone={() => setToast(null)} />;
+
+  if (page === 'login') {
+    return (
+      <>
+        <LoginView
+          usuarios={S.usuarios}
+          cuentasDemo={['u-lucia', 'u-martin', 'u-uap', 'u-dir-isi', 'u-consejo', 'u-admin']}
+          isDark={isDark}
+          toggleTheme={toggleTheme}
+          onLogin={iniciarSesion}
+        />
+        {toastEl}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      {page !== 'login' && <Sidebar role={role} page={page} onNavigate={handleNavigate} cycle={S.cycle} />}
+      <Sidebar role={role} page={page} onNavigate={handleNavigate} cycle={S.cycle} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        {page !== 'login' && (
-          <Header
-            cycle={S.cycle}
-            role={role}
-            setRole={handleRoleChange}
-            uid={uid}
-            setUid={setUid}
-            careerId={careerId}
-            setCareerId={setCareerId}
-            docentes={S.usuarios.filter((u) => u.rol === 'Docente')}
-            carreras={S.carreras}
-            activeUserName={activeUserName}
-            isDark={isDark}
-            toggleTheme={toggleTheme}
-            notifications={notifications}
-            onSelectNotification={(docId) => {
-              setActiveDocId(docId);
-              setPage('doc');
-            }}
-            onNavigate={handleNavigate}
-            onLogout={() => {
-              setPage('login');
-              showToast('Sesión finalizada.');
-            }}
-          />
-        )}
+        <Header
+          cycle={S.cycle}
+          role={role}
+          setRole={handleRoleChange}
+          uid={uid}
+          setUid={setUid}
+          careerId={careerId}
+          setCareerId={setCareerId}
+          docentes={S.usuarios.filter((u) => u.rol === 'Docente')}
+          carreras={S.carreras}
+          activeUserName={activeUserName}
+          isDark={isDark}
+          toggleTheme={toggleTheme}
+          notifications={notifications}
+          onSelectNotification={(docId) => {
+            setActiveDocId(docId);
+            setPage('doc');
+          }}
+          onNavigate={handleNavigate}
+          onOpenPasswordModal={() => setPasswordModalOpen(true)}
+          onLogout={() => {
+            setPage('login');
+            showToast('Sesión finalizada.');
+          }}
+        />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {page === 'login' && (
-            <div className="max-w-md mx-auto mt-16 bg-surface border border-border rounded-2xl p-8 shadow-lg space-y-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-soft border border-primary/30 flex items-center justify-center font-serif font-bold text-primary text-xl">
-                  S
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-ink leading-none">SIIGPA · DACEFyN</h1>
-                  <span className="text-xs text-muted">Ingreso Institucional UNLaR</span>
-                </div>
-              </div>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Email o DNI</label>
-                  <input defaultValue={userBy(uid)?.email || 'titular.prog@unlar.edu.ar'} className="w-full rounded-lg bg-background border border-border px-3 py-2.5 text-ink" />
-                </div>
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Contraseña</label>
-                  <input type="password" defaultValue="12345678" className="w-full rounded-lg bg-background border border-border px-3 py-2.5 text-ink" />
-                </div>
-                <button
-                  onClick={() => {
-                    setPage('home');
-                    showToast(`Bienvenido/a, ${activeUserName}`);
-                  }}
-                  className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition"
-                >
-                  Iniciar Sesión
-                </button>
-              </div>
-            </div>
-          )}
-
           {(page === 'home' || page === 'planificaciones') && (
             <PlanificacionesList
               paacs={paacs}
@@ -468,43 +490,6 @@ export default function App() {
             />
           )}
 
-          {page === 'cambiar-password' && (
-            <div className="max-w-md mx-auto mt-10 bg-surface border border-border rounded-2xl p-6 shadow-md space-y-4">
-              <h1 className="text-base font-bold text-ink">Cambiar Contraseña</h1>
-              <p className="text-xs text-muted">
-                Usuario activo: <strong>{activeUserName}</strong>
-              </p>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Contraseña Actual / DNI Inicial</label>
-                  <input type="password" placeholder="Contraseña actual" className="w-full rounded-lg bg-background border border-border px-3 py-2 text-ink" />
-                </div>
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Nueva Contraseña</label>
-                  <input type="password" placeholder="Mínimo 8 caracteres" className="w-full rounded-lg bg-background border border-border px-3 py-2 text-ink" />
-                </div>
-                <div>
-                  <label className="block font-semibold text-ink mb-1">Repetir Nueva Contraseña</label>
-                  <input type="password" placeholder="Confirmar nueva contraseña" className="w-full rounded-lg bg-background border border-border px-3 py-2 text-ink" />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button onClick={() => setPage('home')} className="px-3.5 py-2 rounded-lg bg-background border border-border text-ink">
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPage('home');
-                      showToast('Contraseña actualizada correctamente.');
-                    }}
-                    className="px-4 py-2 rounded-lg bg-primary text-white font-semibold"
-                  >
-                    Guardar Contraseña
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {page === 'admin-estructura' && role === 'ADMINISTRADOR' && (
             <AdminEstructuraView
               S={S}
@@ -650,7 +635,16 @@ export default function App() {
         />
       )}
 
-      {toast && <Toast key={toast.id} message={toast.msg} tone={toast.tone} onDone={() => setToast(null)} />}
+      <CambiarPasswordModal
+        open={passwordModalOpen}
+        activeUserName={activeUserName}
+        rolLabel={ROLES[role] ?? role}
+        obligatorio={debeCambiarPassword}
+        onClose={() => setPasswordModalOpen(false)}
+        onConfirm={actualizarPassword}
+      />
+
+      {toastEl}
     </div>
   );
 }
