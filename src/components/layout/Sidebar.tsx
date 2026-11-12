@@ -17,6 +17,12 @@ interface NavItem {
 
 const STORAGE_KEY = 'siigpa.sidebar.collapsed';
 
+/** Normativa vigente con enlace al Digesto de la UNLaR. */
+const NORMATIVA = [
+  { label: 'Ord. HCS N° 171/2019', href: 'https://digesto.unlar.edu.ar/archivos/2637_HCS-171-2019_3652187.pdf' },
+  { label: 'Ord. HCS N° 219/2022', href: 'https://digesto.unlar.edu.ar/pages/normativa.php?id=3478' },
+] as const;
+
 function leerPreferencia(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === '1';
@@ -134,9 +140,19 @@ export function Sidebar({ role, page, onNavigate, cycle }: Props) {
           }`}
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Normativa vigente</div>
-          <div>• Ord. HCS N° 171/2019</div>
-          <div>• Ord. HCS N° 219/2022</div>
-          <div>• Ord. HCS N° 448/2011</div>
+          {NORMATIVA.map((n) => (
+            <a
+              key={n.href}
+              href={n.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`${n.label} (se abre en una pestaña nueva)`}
+              className="block rounded text-[11px] text-muted transition hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              • {n.label}
+              <span className="sr-only"> (se abre en una pestaña nueva)</span>
+            </a>
+          ))}
           <div className="pt-2 text-[10px] font-semibold text-primary">DACEFyN · Ciclo Lectivo {cycle}</div>
         </div>
         {collapsed && (

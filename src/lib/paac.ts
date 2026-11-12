@@ -361,3 +361,9 @@ export function paacDesdeDatosAnteriores(data: PaacData): PaacContenido {
     ),
   };
 }
+
+/** Porcentaje de campos completos del PAAC (misma cuenta que el índice del editor). */
+export function progresoPaac(c: PaacContenido, aspectos: AspectosPaac, porCompetencias: boolean): number {
+  const campos = apartadosPaac(c, aspectos, porCompetencias).flatMap((a) => a.campos);
+  return campos.length ? Math.round((campos.filter((f) => f.ok).length / campos.length) * 100) : 100;
+}

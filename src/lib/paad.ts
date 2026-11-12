@@ -250,3 +250,11 @@ export function validarPaad(c: PaadContenido, comments: ObservacionDoc[]): strin
   if (pendientes > 0) problemas.push(`Hay ${pendientes} observación(es) sin marcar como subsanadas.`);
   return problemas;
 }
+
+/** Avance del PAAD: apartados 1) a 7) con al menos un ítem y 8) con horas cargadas (misma regla que el editor). */
+export function progresoPaad(c: PaadContenido): { completados: number; total: number; pct: number } {
+  const conItems = APARTADOS_PAAD.filter((ap) => ap.subapartados.some((sub) => sub.listas.some((l) => c.listas[l.key].length > 0))).length;
+  const completados = conItems + (totalHoras(c) > 0 ? 1 : 0);
+  const total = APARTADOS_PAAD.length + 1;
+  return { completados, total, pct: Math.round((completados / total) * 100) };
+}

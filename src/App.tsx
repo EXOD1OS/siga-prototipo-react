@@ -10,6 +10,7 @@ import { PaadsListView } from './components/views/PaadsListView';
 import { DocumentFormView } from './components/views/DocumentFormView';
 import { ReportEvaluationView } from './components/views/ReportEvaluationView';
 import { LoginView } from './components/views/LoginView';
+import { DocenteDashboardView } from './components/views/DocenteDashboardView';
 import { CambiarPasswordModal } from './components/shared/CambiarPasswordModal';
 import type { Usuario } from './types/estructura';
 import { AdminEstructuraView } from './components/views/AdminEstructuraView';
@@ -329,7 +330,31 @@ export default function App() {
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {(page === 'home' || page === 'planificaciones') && (
+          {page === 'home' && role.startsWith('DOCENTE') && (
+            <DocenteDashboardView
+              role={role}
+              uid={uid}
+              activeUserName={activeUserName}
+              ciclo={S.cycle}
+              paacs={paacs}
+              paad={S.docs.find((d) => d.type === 'PAAD' && d.owner === uid && d.cycle === S.cycle)}
+              usuarios={S.usuarios}
+              equiposCatedra={S.equiposCatedra}
+              asigContext={asigContext}
+              onOpenDoc={(id: string) => {
+                setPaadContexto(null);
+                setActiveDocId(id);
+                setPage('doc');
+              }}
+              onOpenReport={(id: string) => {
+                setActiveDocId(id);
+                setPage('report');
+              }}
+              onVerPlanificaciones={() => handleNavigate('planificaciones')}
+            />
+          )}
+
+          {(page === 'planificaciones' || (page === 'home' && !role.startsWith('DOCENTE'))) && (
             <PlanificacionesList
               paacs={paacs}
               role={role}
