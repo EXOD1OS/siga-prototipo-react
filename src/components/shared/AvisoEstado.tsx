@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
-import { IconAlert, IconCheck, IconClock, IconLock } from '../layout/icons';
+import { IconAlert, IconCheck, IconClock, IconLock, IconSeal } from '../layout/icons';
 import { esReenvio } from '../../lib/revision';
 import type { InformeEvaluacion } from '../../types/planificacion';
 
-export type TonoAviso = 'lectura' | 'observado' | 'revision' | 'listo';
+export type TonoAviso = 'lectura' | 'observado' | 'revision' | 'listo' | 'tramite' | 'protocolizado';
 
 const TONOS: Record<TonoAviso, { Icon: typeof IconLock; caja: string; icono: string; rol: 'note' | 'status' }> = {
   lectura: {
@@ -30,6 +30,20 @@ const TONOS: Record<TonoAviso, { Icon: typeof IconLock; caja: string; icono: str
     icono: 'border-emerald-500/20 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
     rol: 'status',
   },
+  /** Elevado al Consejo: expediente caratulado, resolución pendiente. */
+  tramite: {
+    Icon: IconClock,
+    caja: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-800 dark:text-indigo-200',
+    icono: 'border-indigo-500/20 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300',
+    rol: 'status',
+  },
+  /** Finalizado: protocolizado e inmutable. */
+  protocolizado: {
+    Icon: IconSeal,
+    caja: 'border-emerald-600/40 bg-emerald-500/15 text-emerald-900 dark:text-emerald-100',
+    icono: 'border-emerald-600/30 bg-emerald-600/20 text-emerald-700 dark:text-emerald-300',
+    rol: 'status',
+  },
 };
 
 /** Ícono en contenedor redondeado, con el mismo acabado que las notificaciones del Header. */
@@ -42,10 +56,24 @@ export function IconoEstado({ tono, className = 'h-8 w-8' }: { tono: TonoAviso; 
   );
 }
 
-export function AvisoEstado({ tono, titulo, etiqueta, children }: { tono: TonoAviso; titulo: string; etiqueta?: string; children?: ReactNode }) {
+export function AvisoEstado({
+  tono,
+  titulo,
+  etiqueta,
+  accion,
+  children,
+}: {
+  tono: TonoAviso;
+  titulo: string;
+  etiqueta?: string;
+  /** Acción en el propio aviso (ej. «Cargar Resolución» para el Consejo). */
+  accion?: ReactNode;
+  children?: ReactNode;
+}) {
   const t = TONOS[tono];
   return (
-    <div role={t.rol} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-xs ${t.caja}`}>
+    <div role={t.rol} className={`flex flex-col gap-3 rounded-xl border px-4 py-3 text-xs sm:flex-row sm:items-center ${t.caja}`}>
+      <div className="flex min-w-0 flex-1 items-start gap-3">
       <IconoEstado tono={tono} />
       <div className="min-w-0 pt-0.5">
         <p className="flex flex-wrap items-center gap-2 font-semibold">
@@ -54,13 +82,15 @@ export function AvisoEstado({ tono, titulo, etiqueta, children }: { tono: TonoAv
         </p>
         {children && <div className="mt-0.5 leading-relaxed opacity-90">{children}</div>}
       </div>
+      </div>
+      {accion && <div className="shrink-0">{accion}</div>}
     </div>
   );
 }
 
 /** Aviso que corresponde al documento según su estado y los permisos de la sesión (null = ninguno). */
 export function avisoDeDocumento(opts: {
-  d: { state: string; pedReport?: InformeEvaluacion; discReport?: InformeEvaluacion };
+  d: { state: string; pedReport?: InformeEvaluacion; discReport?: InformeEvaluacion; expediente?: string; resolucion?: string };
   tipo: 'PAAC' | 'PAAD';
   canEdit: boolean;
   canObserve: boolean;
@@ -69,6 +99,21 @@ export function avisoDeDocumento(opts: {
   pendientes: number;
 }): { tono: TonoAviso; titulo: string; texto?: string; etiqueta?: string } | null {
   const { d, tipo, canEdit, canObserve, esDocente, pendientes } = opts;
+  // Protocolización del PAAC (Consejo Departamental): prevalece sobre cualquier otro aviso.
+  if (d.state === 'FINALIZADO') {
+    return {
+      tono: 'protocolizado',
+      titulo: `Planificación Finalizada y Protocolizada (Inmutable) · Expediente: ${d.expediente || '—'} · Resolución: ${d.resolucion || '—'}`,
+      texto: 'El documento quedó cerrado de forma permanente: no admite cambios, observaciones ni modificaciones de los informes.',
+    };
+  }
+  if (d.state === 'ELEVADO_AL_CONSEJO') {
+    return {
+      tono: 'tramite',
+      titulo: `En trámite de Resolución · Expediente N° ${d.expediente || '—'} (Pendiente de carga de Resolución del Consejo Superior)`,
+      texto: 'El documento está en lectura mientras el Consejo Superior emite la Resolución.',
+    };
+  }
   const enCorreccion = esReenvio(d);
   if (canEdit) {
     if (!enCorreccion) return null;

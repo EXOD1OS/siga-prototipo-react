@@ -17,12 +17,13 @@ import {
 import { ESTADOS_FAVORABLES, contar, ordenanzaDe, paacsDe, tarjetaDe, type DatosDashboard, type NavDashboard } from './datos';
 import type { FiltrosPaac } from '../../../types/navegacion';
 import type { PaacDoc } from '../../../types/planificacion';
+import { BotonProtocolo, etapaProtocolo } from '../../planificaciones/BotonProtocolo';
 
 interface Props {
   datos: DatosDashboard;
   nav: NavDashboard;
-  /** Asigna expediente y Resolución CD (mismo circuito que el listado). */
-  onFormalizar: (id: string) => void;
+  /** Protocolización en dos instancias: expediente (APROBADO_PLENO) y resolución (ELEVADO_AL_CONSEJO). */
+  onProtocolizar: (id: string) => void;
 }
 
 type FiltroConsejo = 'pendientes' | 'finalizadas' | 'favorables';
@@ -32,7 +33,7 @@ const PENDIENTES = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'];
  * Inicio del Consejo Departamental: cátedras evaluadas favorablemente, elevadas y protocolizadas.
  * Puede verse sobre el ciclo vigente o sobre todos los ciclos (las finalizadas suelen ser de ciclos anteriores).
  */
-export function ConsejoDashboardView({ datos, nav, onFormalizar }: Props) {
+export function ConsejoDashboardView({ datos, nav, onProtocolizar }: Props) {
   const { nombre, ciclo, asigContext } = datos;
   const [alcance, setAlcance] = useState<'ciclo' | 'todos'>('ciclo');
   const [filtro, setFiltro] = useState<FiltroConsejo>('pendientes');
@@ -203,24 +204,24 @@ export function ConsejoDashboardView({ datos, nav, onFormalizar }: Props) {
               {lista.map((d) => {
                 const tarjeta = tarjetaDe(d, datos);
                 tarjeta.acento = d.state === 'FINALIZADO' ? COLOR.aprobado : d.state === 'ELEVADO_AL_CONSEJO' ? COLOR.elevado : COLOR.pleno;
+                const etapa = etapaProtocolo(d.state);
                 tarjeta.extra =
                   d.state === 'FINALIZADO' ? (
-                    <span className="text-right text-[11px] leading-tight">
-                      <span className="block font-mono font-semibold text-primary">{d.expediente || '—'}</span>
-                      <span className="block text-muted">{d.resolucion || 'Resolución en trámite'}</span>
+                    <span className="text-right text-[11px] leading-tight" title="Planificación cerrada e inmutable">
+                      <span className="block font-mono font-semibold text-ink">{d.expediente || '—'}</span>
+                      <span className="block font-mono text-muted">{d.resolucion || '—'}</span>
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onFormalizar(d.id);
-                      }}
-                      className="relative z-10 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    >
-                      Formalizar Expediente y Resolución
-                    </button>
-                  );
+                  ) : etapa ? (
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      {etapa === 'resolucion' && (
+                        <span className="hidden text-right leading-tight sm:block">
+                          <span className="block font-mono text-xs font-semibold text-ink">{d.expediente || '—'}</span>
+                          <span className="block text-[11px] text-muted">Resolución pendiente</span>
+                        </span>
+                      )}
+                      <BotonProtocolo etapa={etapa} onClick={() => onProtocolizar(d.id)} detenerPropagacion className="relative z-10" />
+                    </span>
+                  ) : undefined;
                 return <SelectableCatedraCard key={d.id} c={tarjeta} onOpen={() => nav.onOpenDoc(d.id)} onReport={() => nav.onOpenReport(d.id)} />;
               })}
             </ul>

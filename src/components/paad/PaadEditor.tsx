@@ -36,7 +36,7 @@ interface PaadEditorProps {
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
   /** UAP / Dirección / Admin eliminan una observación propia. */
-  onDeleteObs: (obsId: string) => void;
+  onDeleteObs?: (obsId: string) => void;
 }
 
 type Vista = 'form' | 'preview';

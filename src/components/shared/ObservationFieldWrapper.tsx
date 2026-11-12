@@ -12,7 +12,8 @@ interface Props {
   role: string;
   onAddObs: (fKey: string, campoPath: string, text: string) => void;
   onResolveObs: (obsId: string) => void;
-  onDeleteObs: (obsId: string) => void;
+  /** Sin esta función no se muestra «Eliminar» (documentos cerrados). */
+  onDeleteObs?: (obsId: string) => void;
   children: ReactNode;
 }
 
@@ -80,7 +81,7 @@ export function ObservationFieldWrapper({ fKey, label, campoPath, notes, canEdit
                       <span className={`truncate text-[11px] font-bold ${a.autor}`}>{o.author ?? a.nombre}</span>
                       <span className="flex shrink-0 items-center gap-1.5">
                         <span className="text-[10px] text-muted">{o.date}</span>
-                        {puedeEliminarObservacion(role, o) && (
+                        {onDeleteObs && puedeEliminarObservacion(role, o) && (
                           <button
                             type="button"
                             onClick={() => onDeleteObs(o.id)}

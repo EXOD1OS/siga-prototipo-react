@@ -502,7 +502,8 @@ export function createInitialData() {
     }),
     paac({
       id: 'paac-h3', asignaturaId: 'asig-sis1', owner: 'u-sofia', cycle: 2025, periodo: '1C', state: 'ELEVADO_AL_CONSEJO', pedApproved: true, discApproved: true,
-      expediente: 'EXP-2025-0503',
+      // 1.ª instancia cumplida: expediente caratulado, resolución del Consejo Superior pendiente.
+      expediente: 'EXP-UNLaR-2026-00389', resolucion: '', fechaElevacion: '12/05/2025',
       data: { ...docs[1].data },
       pedReport: informeFavorable('ped', 'Ana Suárez', '05/05/2025', 'Adecuada secuenciación de contenidos.'),
       discReport: informeFavorable('disc', 'María Vega', '08/05/2025', 'Cumple; se sugiere ampliar bibliografía complementaria.'),

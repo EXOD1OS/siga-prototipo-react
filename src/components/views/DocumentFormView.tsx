@@ -7,6 +7,7 @@ import type { PaacContenido } from '../../types/paac';
 import type { AsigContext, DocumentoResumen, EquipoCatedra, Usuario } from '../../types/estructura';
 import type { DocumentoEditable } from '../../types/planificacion';
 import type { InfoRevision } from '../shared/PanelRevision';
+import { esDocumentoCerrado } from '../../lib/revision';
 
 interface DocumentFormViewProps {
   d: DocumentoEditable;
@@ -37,6 +38,8 @@ interface DocumentFormViewProps {
   paadContexto?: { asignaturaId?: string | null; carreraId?: string | null };
   /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa este documento). */
   revision: InfoRevision | null;
+  /** Consejo Departamental: abre la carga de la Resolución de un PAAC elevado. */
+  onCargarResolucion?: () => void;
 }
 
 /** Abre el editor del documento según su tipo: PAAD (Anexo III) o PAAC. */
@@ -63,7 +66,10 @@ export function DocumentFormView({
   onOpenPaadModal,
   paadContexto,
   revision,
+  onCargarResolucion,
 }: DocumentFormViewProps) {
+  // Documento cerrado (aprobado, elevado o finalizado): nadie elimina observaciones.
+  const eliminarObs = esDocumentoCerrado(d.state) ? undefined : onDeleteObs;
   if (d.type === 'PAAD') {
     // Un solo PAAD por ciclo; los Aspectos Generales se proyectan sobre cada cátedra del docente.
     const fuente: FuentePaad = { ciclo: d.cycle, usuarios: S.usuarios, equipos: S.equiposCatedra, asigContext };
@@ -89,7 +95,7 @@ export function DocumentFormView({
         onSubmitDoc={onSubmitDoc}
         onAddObs={onAddObs}
         onResolveObs={onResolveObs}
-        onDeleteObs={onDeleteObs}
+        onDeleteObs={eliminarObs}
       />
     );
   }
@@ -132,12 +138,13 @@ export function DocumentFormView({
       onBack={onBack}
       onOpenReport={() => onOpenReport(d.id)}
       onOpenPaadModal={(paadId) => onOpenPaadModal(paadId, d.asignaturaId)}
+      onCargarResolucion={d.state === 'ELEVADO_AL_CONSEJO' ? onCargarResolucion : undefined}
       onUpdatePaac={onUpdatePaac}
       onSaveDraft={onSaveDraft}
       onSubmitDoc={onSubmitDoc}
       onAddObs={onAddObs}
       onResolveObs={onResolveObs}
-      onDeleteObs={onDeleteObs}
+      onDeleteObs={eliminarObs}
     />
   );
 }

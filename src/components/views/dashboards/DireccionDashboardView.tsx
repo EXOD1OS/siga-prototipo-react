@@ -110,7 +110,7 @@ export function DireccionDashboardView({ datos, nav, careerId, asignaturas, plan
               <MetricaBarra titulo="Tasa de presentación de PAAD" valor={paads.length - ep.borrador} total={paads.length} />
               {listosParaElevar > 0 ? (
                 <button type="button" onClick={() => nav.goToPlanificaciones({ ...f, state: 'APROBADO_PLENO' })} className={linkCls}>
-                  Cátedras listas para elevar ({listosParaElevar}) →
+                  Con aprobación plena: a caratular por el Consejo ({listosParaElevar}) →
                 </button>
               ) : (
                 <button type="button" onClick={() => nav.goToPaads(carreraPaad)} className={linkCls}>

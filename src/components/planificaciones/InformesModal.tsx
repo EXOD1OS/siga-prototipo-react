@@ -2,6 +2,7 @@ import { useId, useState, type KeyboardEvent } from 'react';
 import { Modal, ModalButton } from '../shared/Modal';
 import { StatusBadge } from '../shared/StatusBadge';
 import { InformeLectura } from '../informes/InformeLectura';
+import { BotonProtocolo, type EtapaProtocolo } from './BotonProtocolo';
 import { encabezadoInforme, integrantesEquipo, type DocPaadResumen } from '../../lib/informes';
 import {
   BTN_DESCARGAR_PDF,
@@ -27,8 +28,8 @@ import {
  * Los informes no se emiten ni se aprueban desde aquí: solo entrando al PAAC.
  */
 export interface AccionesInforme {
-  onElevar: (() => void) | null;
-  onFormalizar: (() => void) | null;
+  /** Consejo Departamental: cargar expediente (1.ª instancia) o resolución (2.ª instancia). */
+  protocolizar: { label: string; etapa: EtapaProtocolo; fn: () => void } | null;
 }
 
 interface InformesModalProps {
@@ -99,7 +100,7 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
     document.getElementById(`${uid}-tab-${next}`)?.focus();
   };
 
-  const hayAcciones = !!(acciones.onElevar || acciones.onFormalizar);
+  const hayAcciones = !!acciones.protocolizar;
 
   return (
     <Modal
@@ -120,16 +121,7 @@ export function InformesModal({ doc, ctx, responsable, equipo, fullName, docs, a
           {hayAcciones && (
             <span className="mr-auto flex flex-wrap gap-2">
 
-              {acciones.onElevar && (
-                <ModalButton variant="primary" onClick={acciones.onElevar}>
-                  Elevar al Consejo
-                </ModalButton>
-              )}
-              {acciones.onFormalizar && (
-                <ModalButton variant="primary" onClick={acciones.onFormalizar}>
-                  Formalizar expediente
-                </ModalButton>
-              )}
+              {acciones.protocolizar && <BotonProtocolo etapa={acciones.protocolizar.etapa} onClick={acciones.protocolizar.fn} />}
             </span>
           )}
           <ModalButton onClick={onClose}>Cerrar</ModalButton>

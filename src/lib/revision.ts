@@ -26,8 +26,10 @@ export const ESTADOS_EN_REVISION = ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO',
  */
 export const ESTADOS_REVISION_PAAD = ['ENVIADO_A_REVISION', 'OBSERVADO'];
 
-/** Estados cerrados: nadie edita, observa ni dictamina. */
+/** Estados cerrados: nadie edita, observa (agrega, subsana o elimina) ni dictamina. FINALIZADO es definitivo. */
 const ESTADOS_CERRADOS = ['APROBADO', 'APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+
+export const esDocumentoCerrado = (state: string) => ESTADOS_CERRADOS.includes(state);
 
 export const AREA_LABEL: Record<AreaRevision, { corto: string; dictamen: string }> = {
   uap: { corto: 'UAP', dictamen: 'dictamen pedagógico' },

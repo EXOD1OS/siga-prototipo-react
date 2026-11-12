@@ -85,8 +85,12 @@ export interface PaacDoc {
   state: EstadoPlanif;
   pedApproved: boolean;
   discApproved: boolean;
+  /** Expediente caratulado por el Consejo Departamental (1.ª instancia). */
   expediente: string;
+  /** Resolución del Consejo Superior (2.ª instancia: cierra el PAAC). */
   resolucion: string;
+  fechaElevacion?: string;
+  fechaResolucion?: string;
   data: PaacData;
   /** Contenido estructurado del PAAC (reemplaza a `data`, que queda solo por compatibilidad). */
   paac?: PaacContenido;
@@ -118,6 +122,11 @@ export interface DocumentoEditable {
   discReport?: InformeEvaluacion;
   sinGuardar?: boolean;
   guardadoEn?: string;
+  /** Protocolización (solo PAAC). */
+  expediente?: string;
+  resolucion?: string;
+  fechaElevacion?: string;
+  fechaResolucion?: string;
 }
 
 export function esHistorica(d: Pick<PaacDoc, 'state'>): boolean {

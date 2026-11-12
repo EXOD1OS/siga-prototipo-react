@@ -11,6 +11,7 @@ import { DocumentFormView } from './components/views/DocumentFormView';
 import { ReportEvaluationView } from './components/views/ReportEvaluationView';
 import { LoginView } from './components/views/LoginView';
 import { DocenteDashboardView } from './components/views/DocenteDashboardView';
+import { ProtocolizacionModal } from './components/planificaciones/ProtocolizacionModal';
 import { UapDashboardView } from './components/views/dashboards/UapDashboardView';
 import { DireccionDashboardView } from './components/views/dashboards/DireccionDashboardView';
 import { ConsejoDashboardView } from './components/views/dashboards/ConsejoDashboardView';
@@ -25,6 +26,7 @@ import type { InformeEvaluacion } from './types/planificacion';
 import {
   areaDeRol,
   esEditablePorDocente,
+  esDocumentoCerrado,
   esReenvio,
   ESTADOS_EN_REVISION,
   ESTADOS_REVISION_PAAD,
@@ -51,6 +53,8 @@ export default function App() {
   const [navFilterPaad, setNavFilterPaad] = useState<FiltrosPaad | null>(null);
   // Cambia en cada navegación: remonta el listado para que arranque con los filtros recibidos.
   const [navKey, setNavKey] = useState(0);
+  // PAAC en protocolización (Consejo): la etapa la define su estado.
+  const [protocolizarId, setProtocolizarId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string; tone: ToastTone } | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
@@ -216,13 +220,31 @@ export default function App() {
     setPage('paads');
   };
 
-  /** Consejo: asigna expediente y Resolución CD y finaliza el PAAC. */
-  const formalizarPaac = (id: string) => {
+  // ---- Protocolización por el Consejo Departamental (dos instancias separadas en el tiempo) ----
+  const puedeProtocolizar = role === 'CONSEJO_DEPARTAMENTAL';
+
+  /** 1.ª instancia: con aprobación plena, se caratula el expediente y el PAAC queda elevado. */
+  const registrarExpediente = (id: string, expediente: string, fecha: string) => {
     setS((prev) => ({
       ...prev,
-      docs: prev.docs.map((x) => (x.id === id ? { ...x, expediente: 'EXP-2026-104', resolucion: 'RES-CD-088/26', state: 'FINALIZADO' } : x)),
+      docs: prev.docs.map((x) =>
+        x.id === id && x.state === 'APROBADO_PLENO' ? { ...x, expediente, resolucion: '', fechaElevacion: fecha, state: 'ELEVADO_AL_CONSEJO' } : x
+      ),
     }));
-    showToast('Expediente y Resolución CD asignados: PAAC finalizado.');
+    setProtocolizarId(null);
+    showToast('Expediente registrado. Planificación elevada al Consejo.');
+  };
+
+  /** 2.ª instancia: con la Resolución del Consejo Superior, el PAAC queda FINALIZADO e inmutable. */
+  const registrarResolucion = (id: string, resolucion: string, fecha: string) => {
+    setS((prev) => ({
+      ...prev,
+      docs: prev.docs.map((x) =>
+        x.id === id && x.state === 'ELEVADO_AL_CONSEJO' ? { ...x, resolucion, fechaResolucion: fecha, state: 'FINALIZADO' } : x
+      ),
+    }));
+    setProtocolizarId(null);
+    showToast('Resolución registrada. La planificación ha quedado finalizada de forma permanente.');
   };
 
   const canEditDoc = (d: any) => {
@@ -408,7 +430,7 @@ export default function App() {
           )}
 
           {page === 'home' && role === 'CONSEJO_DEPARTAMENTAL' && (
-            <ConsejoDashboardView datos={datosDashboard} nav={navDashboard} onFormalizar={formalizarPaac} />
+            <ConsejoDashboardView datos={datosDashboard} nav={navDashboard} onProtocolizar={setProtocolizarId} />
           )}
 
           {page === 'home' && role.startsWith('DOCENTE') && (
@@ -453,13 +475,7 @@ export default function App() {
                 setActiveDocId(id);
                 setPage('doc');
               }}
-              onElevarPaac={(id: string) =>
-                setS((prev) => ({
-                  ...prev,
-                  docs: prev.docs.map((x) => (x.id === id ? { ...x, state: 'ELEVADO_AL_CONSEJO' } : x)),
-                }))
-              }
-              onOpenFormalizarModal={formalizarPaac}
+              onProtocolizar={puedeProtocolizar ? setProtocolizarId : undefined}
               onViewFinal={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
@@ -565,7 +581,10 @@ export default function App() {
                   return doc;
                 })
               }
+              onCargarResolucion={puedeProtocolizar ? () => setProtocolizarId(currentDoc.id) : undefined}
               onDeleteObs={(obsId: string) => {
+                // Defensa: en documentos cerrados (aprobados, elevados o finalizados) no se eliminan observaciones.
+                if (esDocumentoCerrado(currentDoc.state)) return;
                 updateActiveDoc((doc) => {
                   doc.comments = doc.comments.filter((x: any) => x.id !== obsId);
                   return doc;
@@ -753,6 +772,22 @@ export default function App() {
           />
         );
       })()}
+      {protocolizarId && (() => {
+        const doc = paacs.find((x) => x.id === protocolizarId);
+        if (!doc || !puedeProtocolizar) return null;
+        return (
+          <ProtocolizacionModal
+            key={`${doc.id}-${doc.state}`}
+            doc={doc}
+            ctx={asigContext(doc.asignaturaId)}
+            responsable={fullName(doc.owner)}
+            onClose={() => setProtocolizarId(null)}
+            onRegistrarExpediente={(exp, fecha) => registrarExpediente(doc.id, exp, fecha)}
+            onRegistrarResolucion={(res, fecha) => registrarResolucion(doc.id, res, fecha)}
+          />
+        );
+      })()}
+
       <CambiarPasswordModal
         open={passwordModalOpen}
         activeUserName={activeUserName}

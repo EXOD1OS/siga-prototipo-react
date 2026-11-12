@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
+import { IconLock } from '../layout/icons';
+import { BTN_FILA, BotonProtocolo, LABEL_PROTOCOLO, etapaProtocolo } from '../planificaciones/BotonProtocolo';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
 import type { DocPaadResumen } from '../../lib/informes';
 import { describirFiltros, type FiltrosPaac } from '../../types/navegacion';
@@ -35,8 +37,8 @@ interface PlanificacionesListProps {
   puedeEditar: (d: PaacDoc) => boolean;
   /** Abre el editor / visor del PAAC. */
   onOpenDoc: (id: string) => void;
-  onElevarPaac: (id: string) => void;
-  onOpenFormalizarModal: (id: string) => void;
+  /** Consejo Departamental: protocolización (1.ª expediente, 2.ª resolución). Sin esta función no hay acciones. */
+  onProtocolizar?: (id: string) => void;
   onViewFinal: (id: string) => void;
   /** Documentos del sistema (PAAD del equipo, para la hoja oficial de los informes). */
   docs: DocPaadResumen[];
@@ -135,8 +137,7 @@ export function PlanificacionesList({
   fullName,
   puedeEditar,
   onOpenDoc,
-  onElevarPaac,
-  onOpenFormalizarModal,
+  onProtocolizar,
   onViewFinal,
   docs,
   filtrosIniciales,
@@ -235,6 +236,12 @@ export function PlanificacionesList({
     ? 'Planificaciones donde sos responsable o integrás el equipo de cátedra (ciclo actual e históricos).'
     : (DESCRIPCION_ALCANCE[role] ?? '');
 
+  // ---- Protocolización (Consejo): expediente en APROBADO_PLENO, resolución en ELEVADO_AL_CONSEJO ----
+  const accionProtocolo = (d: PaacDoc) => {
+    const etapa = onProtocolizar ? etapaProtocolo(d.state) : null;
+    return etapa ? { etapa, label: LABEL_PROTOCOLO[etapa] } : null;
+  };
+
   // ---- Modal de informes ----
   const docInformes = informesId ? visibles.find((d) => d.id === informesId) : undefined;
   // El modal de informes es solo de consulta: los informes se emiten entrando al PAAC.
@@ -243,13 +250,8 @@ export function PlanificacionesList({
       setInformesId(null);
       fn(d.id);
     };
-    return {
-      onElevar: esDireccion && d.state === 'APROBADO_PLENO' ? cerrarY(onElevarPaac) : null,
-      onFormalizar:
-        role === 'CONSEJO_DEPARTAMENTAL' && ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'].includes(d.state)
-          ? cerrarY(onOpenFormalizarModal)
-          : null,
-    };
+    const accion = accionProtocolo(d);
+    return { protocolizar: accion && onProtocolizar ? { ...accion, fn: cerrarY(onProtocolizar) } : null };
   };
 
   return (
@@ -393,18 +395,18 @@ export function PlanificacionesList({
         {/* Tabla */}
         <div className="overflow-x-auto">
           {/* table-fixed + anchos por columna (suman 100%): los encabezados no se mueven al filtrar ni con 0 resultados. */}
-          <table className="w-full table-fixed min-w-[1200px] text-left border-collapse text-xs">
+          <table className="w-full table-fixed min-w-[1360px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border">
-                <th scope="col" className={`${thCls} w-[17%] pl-4 sm:pl-5`}>Asignatura</th>
-                <th scope="col" className={`${thCls} w-[6%]`}>Carrera</th>
+                <th scope="col" className={`${thCls} w-[14%] pl-4 sm:pl-5`}>Asignatura</th>
+                <th scope="col" className={`${thCls} w-[5%]`}>Carrera</th>
                 <th scope="col" className={`${thCls} w-[5%]`}>Ciclo</th>
-                <th scope="col" className={`${thCls} w-[12%]`}>Responsable</th>
-                <th scope="col" className={`${thCls} w-[13%]`}>PAAC</th>
-                <th scope="col" className={`${thCls} w-[13%]`}>Estado</th>
-                <th scope="col" className={`${thCls} w-[14%]`}>Dictámenes</th>
-                <th scope="col" className={`${thCls} w-[11%]`}>Expediente</th>
-                <th scope="col" className={`${thCls} w-[9%] pr-4 text-right sm:pr-5`}>Informes</th>
+                <th scope="col" className={`${thCls} w-[11%]`}>Responsable</th>
+                <th scope="col" className={`${thCls} w-[11%]`}>PAAC</th>
+                <th scope="col" className={`${thCls} w-[11%]`}>Estado</th>
+                <th scope="col" className={`${thCls} w-[12%]`}>Dictámenes</th>
+                <th scope="col" className={`${thCls} w-[10%]`}>Expediente / Resolución</th>
+                <th scope="col" className={`${thCls} w-[21%] pr-4 text-right sm:pr-5`}>Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -444,6 +446,7 @@ export function PlanificacionesList({
                     </td>
                     <td className="px-3 py-3">
                       <StatusBadge state={d.state} pendientes={obs} />
+
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
@@ -451,39 +454,51 @@ export function PlanificacionesList({
                         <DictamenChip area="Ped." value={dictamenDe(d.pedApproved, d.pedReport)} />
                       </div>
                     </td>
-                    <td className="min-w-0 px-3 py-3">
+                    <td className="min-w-0 px-3 py-3 align-middle">
                       {d.expediente ? (
-                        <div className="min-w-0">
-                          <span className="block truncate font-mono font-semibold text-primary" title={d.expediente}>
+                        <div className="min-w-0 space-y-0.5">
+                          <span className="block truncate font-mono text-xs font-semibold text-ink" title={d.expediente}>
                             {d.expediente}
                           </span>
-                          <span className="block break-words text-[10px] text-muted">{d.resolucion || 'Resolución en trámite'}</span>
-                          {d.state === 'FINALIZADO' && (
-                            <button type="button" onClick={() => onViewFinal(d.id)} className="text-[10px] font-semibold text-primary hover:underline">
-                              Ver documento final
-                            </button>
+                          {d.state === 'FINALIZADO' ? (
+                            <span className="flex min-w-0 items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" title={`Resolución ${d.resolucion} · documento cerrado`}>
+                              <IconLock className="h-3 w-3 shrink-0" />
+                              <span className="truncate font-mono">{d.resolucion}</span>
+                            </span>
+                          ) : (
+                            <span className="block text-[11px] text-muted">Resolución pendiente</span>
                           )}
                         </div>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 pr-4 text-right sm:pr-5">
-                      {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
-                      <button
-                        type="button"
-                        onClick={() => setInformesId(d.id)}
-                        disabled={!d.pedApproved && !d.discApproved}
-                        aria-label={
-                          d.pedApproved || d.discApproved ? `Ver informes de ${ctx.asig?.nombre}` : `${ctx.asig?.nombre}: aún no hay informes emitidos`
-                        }
-                        title={d.pedApproved || d.discApproved ? undefined : 'Aún no hay informes emitidos'}
-                        className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-primary hover:bg-primary hover:text-white hover:border-primary text-[11px] font-semibold transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface disabled:hover:text-primary disabled:hover:border-border"
-                      >
-                        Informes
-                      </button>
-                    </td>
-                  </tr>
+                    <td className="px-3 py-3 pr-4 align-middle sm:pr-5">
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        {(() => {
+                          const etapa = onProtocolizar ? etapaProtocolo(d.state) : null;
+                          return etapa ? <BotonProtocolo etapa={etapa} onClick={() => onProtocolizar?.(d.id)} /> : null;
+                        })()}
+                        {d.state === 'FINALIZADO' && (
+                          <button type="button" onClick={() => onViewFinal(d.id)} className={BTN_FILA} title="Ver el documento final protocolizado">
+                            Ver PAAC
+                          </button>
+                        )}
+                        {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
+                        <button
+                          type="button"
+                          onClick={() => setInformesId(d.id)}
+                          disabled={!d.pedApproved && !d.discApproved}
+                          aria-label={
+                            d.pedApproved || d.discApproved ? `Ver informes de ${ctx.asig?.nombre}` : `${ctx.asig?.nombre}: aún no hay informes emitidos`
+                          }
+                          title={d.pedApproved || d.discApproved ? undefined : 'Aún no hay informes emitidos'}
+                          className={BTN_FILA}
+                        >
+                          Informes
+                        </button>
+                      </div>
+                    </td>                  </tr>
                 );
               })}
               {filtradas.length === 0 && (

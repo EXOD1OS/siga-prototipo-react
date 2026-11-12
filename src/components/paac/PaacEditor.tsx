@@ -1,6 +1,7 @@
 import { createContext, useContext, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
 import { AvisoEstado, avisoDeDocumento } from '../shared/AvisoEstado';
+import { BotonProtocolo } from '../planificaciones/BotonProtocolo';
 import { BadgeObservaciones, BarraPresentacion } from '../shared/EdicionDocumento';
 import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
 import { IconAlert, IconCheck, IconEye, IconSend } from '../layout/icons';
@@ -62,7 +63,9 @@ interface Props {
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
   /** UAP / Dirección / Admin eliminan una observación propia. */
-  onDeleteObs: (obsId: string) => void;
+  onDeleteObs?: (obsId: string) => void;
+  /** Consejo Departamental: carga la Resolución de un PAAC elevado (2.ª instancia). */
+  onCargarResolucion?: () => void;
 }
 
 type Vista = 'form' | 'preview';
@@ -81,7 +84,7 @@ interface ContextoCampos {
   onAddObs: (fKey: string, path: string, txt: string, secIdx: number) => void;
   onResolveObs: (obsId: string) => void;
   /** UAP / Dirección / Admin eliminan una observación propia. */
-  onDeleteObs: (obsId: string) => void;
+  onDeleteObs?: (obsId: string) => void;
 }
 
 const CamposCtx = createContext<ContextoCampos | null>(null);
@@ -164,6 +167,7 @@ export function PaacEditor({
   onAddObs,
   onResolveObs,
   onDeleteObs,
+  onCargarResolucion,
 }: Props) {
   const [vista, setVista] = useState<Vista>('form');
   const [intento, setIntento] = useState(false);
@@ -347,7 +351,14 @@ export function PaacEditor({
       ) : (
         <CamposCtx.Provider value={ctxCampos}>
           {aviso && (
-            <AvisoEstado tono={aviso.tono} titulo={aviso.titulo} etiqueta={aviso.etiqueta}>
+            <AvisoEstado
+              tono={aviso.tono}
+              titulo={aviso.titulo}
+              etiqueta={aviso.etiqueta}
+              accion={
+                aviso.tono === 'tramite' && onCargarResolucion ? <BotonProtocolo etapa="resolucion" onClick={onCargarResolucion} /> : undefined
+              }
+            >
               {aviso.texto}
             </AvisoEstado>
           )}
