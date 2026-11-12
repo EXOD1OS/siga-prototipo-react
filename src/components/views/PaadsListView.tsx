@@ -4,38 +4,26 @@ import { StatusBadge } from '../shared/StatusBadge';
 interface Props {
   paads: any[];
   role: string;
-  careerId: string;
   carreras: any[];
   equiposCatedra: any[];
   cycle: number;
   fullName: (id: string) => string;
   asigContext: (id: string) => any;
-  onOpenPaadModal: (paadId: string) => void;
+  /** Abre el formulario completo del PAAD: allí UAP o Dirección lo observan o lo aprueban. */
   onOpenPaadDoc: (paadId: string) => void;
-  onApproveUap: (paadId: string) => void;
-  onApproveDir: (paadId: string) => void;
   onChangeEvalCareer: (paadId: string, newCareerId: string) => void;
 }
 
-export function PaadsListView({
-  paads,
-  role,
-  careerId,
-  carreras,
-  equiposCatedra,
-  cycle,
-  fullName,
-  asigContext,
-  onOpenPaadModal,
-  onOpenPaadDoc,
-  onApproveUap,
-  onApproveDir,
-  onChangeEvalCareer,
-}: Props) {
+const pendientesDe = (d: { comments?: { resolved: boolean }[] }) => d.comments?.filter((o) => !o.resolved).length ?? 0;
+
+/**
+ * Bandeja de PAAD (UAP y Dirección de Carrera). El PAAD no tiene doble conformidad:
+ * con que una de las dos áreas lo apruebe queda Aprobado. Las decisiones se toman dentro del formulario.
+ */
+export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fullName, asigContext, onOpenPaadDoc, onChangeEvalCareer }: Props) {
   const [search, setSearch] = useState('');
   const [filterCareer, setFilterCareer] = useState('ALL');
   const [filterState, setFilterState] = useState('ALL');
-  const [filterConformidad, setFilterConformidad] = useState('ALL');
 
   const filtered = paads.filter((d) => {
     const misEq = equiposCatedra.filter((e) => e.docenteId === d.owner && e.cicloLectivo === cycle);
@@ -43,22 +31,11 @@ export function PaadsListView({
     const teacherName = fullName(d.owner);
 
     // Filtro por búsqueda de texto (Docente o Asignatura)
-    if (!`${teacherName} ${asigsNames}`.toLowerCase().includes(search.toLowerCase())) {
-      return false;
-    }
+    if (!`${teacherName} ${asigsNames}`.toLowerCase().includes(search.toLowerCase())) return false;
     // Filtro por Carrera Evaluadora
-    if (filterCareer !== 'ALL' && d.evalCareer !== filterCareer) {
-      return false;
-    }
+    if (filterCareer !== 'ALL' && d.evalCareer !== filterCareer) return false;
     // Filtro por Estado del PAAD
-    if (filterState !== 'ALL' && d.state !== filterState) {
-      return false;
-    }
-    // Filtro por Conformidades (UAP / Dirección)
-    if (filterConformidad === 'PEND_UAP' && d.pedApproved) return false;
-    if (filterConformidad === 'PEND_DIR' && d.discApproved) return false;
-    if (filterConformidad === 'COMPLETOS' && (!d.pedApproved || !d.discApproved)) return false;
-
+    if (filterState !== 'ALL' && d.state !== filterState) return false;
     return true;
   });
 
@@ -67,22 +44,25 @@ export function PaadsListView({
       <div>
         <h1 className="text-2xl font-bold text-ink">Bandeja de PAAD Anuales (UAP y Dirección de Carrera)</h1>
         <p className="text-xs text-muted mt-0.5">
-          Vista exclusiva para evaluación institucional. Filtra por docente, cátedra, carrera evaluadora, estado o conformidades pendientes.
+          Vista exclusiva para evaluación institucional. Filtra por docente, cátedra, carrera evaluadora o estado. El PAAD queda aprobado con la
+          conformidad de la UAP o de la Dirección de Carrera.
         </p>
       </div>
 
       <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
-        {/* Barra de Filtros Multicampo */}
-        <div className="p-4 border-b border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-background/50">
+        {/* Barra de filtros */}
+        <div className="p-4 border-b border-border grid grid-cols-1 sm:grid-cols-3 gap-3 bg-background/50">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por docente o asignatura…"
+            aria-label="Buscar por docente o asignatura"
             className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-xs text-ink outline-none focus:border-primary"
           />
           <select
             value={filterCareer}
             onChange={(e) => setFilterCareer(e.target.value)}
+            aria-label="Dirección evaluadora"
             className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-xs text-ink"
           >
             <option value="ALL">Todas las Direcciones Evaluadoras</option>
@@ -95,6 +75,7 @@ export function PaadsListView({
           <select
             value={filterState}
             onChange={(e) => setFilterState(e.target.value)}
+            aria-label="Estado del PAAD"
             className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-xs text-ink"
           >
             <option value="ALL">Todos los estados de PAAD</option>
@@ -102,16 +83,6 @@ export function PaadsListView({
             <option value="ENVIADO_A_REVISION">En revisión</option>
             <option value="OBSERVADO">Observado</option>
             <option value="APROBADO">PAAD Aprobado</option>
-          </select>
-          <select
-            value={filterConformidad}
-            onChange={(e) => setFilterConformidad(e.target.value)}
-            className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-xs text-ink"
-          >
-            <option value="ALL">Todas las conformidades</option>
-            <option value="PEND_UAP">Pendiente conformidad UAP</option>
-            <option value="PEND_DIR">Pendiente conformidad Dirección</option>
-            <option value="COMPLETOS">Ambas conformidades aprobadas</option>
           </select>
         </div>
 
@@ -123,7 +94,6 @@ export function PaadsListView({
                 <th className="p-4">Cátedras en el Ciclo</th>
                 <th className="p-4">Dirección Evaluadora</th>
                 <th className="p-4">Estado PAAD</th>
-                <th className="p-4">Conformidades</th>
                 <th className="p-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -150,6 +120,7 @@ export function PaadsListView({
                           <select
                             value={d.evalCareer}
                             onChange={(e) => onChangeEvalCareer(d.id, e.target.value)}
+                            aria-label={`Dirección evaluadora del PAAD de ${fullName(d.owner)}`}
                             className="rounded-lg bg-background border border-border px-2.5 py-1 text-xs text-ink"
                           >
                             {carreras.map((c) => (
@@ -159,64 +130,27 @@ export function PaadsListView({
                             ))}
                           </select>
                         ) : (
-                          <span className="px-2.5 py-1 rounded bg-soft text-primary font-semibold text-[11px]">
-                            Dirección {evalCar?.sigla}
-                          </span>
+                          <span className="px-2.5 py-1 rounded bg-soft text-primary font-semibold text-[11px]">Dirección {evalCar?.sigla}</span>
                         )}
                       </td>
                       <td className="p-4">
-                        <StatusBadge state={d.state} pendientes={d.comments?.filter((o: { resolved: boolean }) => !o.resolved).length ?? 0} />
-                      </td>
-                      <td className="p-4 space-y-1">
-                        <div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${d.pedApproved ? 'bg-emerald-500/15 text-emerald-600' : 'bg-background text-muted'}`}>
-                            UAP: {d.pedApproved ? 'Conformidad' : d.pedReport?.dictamen === 'OBSERVADO' ? 'Con observaciones' : 'Pendiente'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${d.discApproved ? 'bg-emerald-500/15 text-emerald-600' : 'bg-background text-muted'}`}>
-                            Dir: {d.discApproved ? 'Conformidad' : d.discReport?.dictamen === 'OBSERVADO' ? 'Con observaciones' : 'Pendiente'}
-                          </span>
-                        </div>
+                        <StatusBadge state={d.state} pendientes={pendientesDe(d)} />
                       </td>
                       <td className="p-4 text-right">
-                        <div className="flex flex-wrap justify-end gap-1.5">
-                          <button
-                            onClick={() => onOpenPaadModal(d.id)}
-                            className="px-2.5 py-1.5 rounded-lg bg-soft text-primary border border-primary/30 font-semibold"
-                          >
-                            Vista previa (Anexo III)
-                          </button>
-                          <button
-                            onClick={() => onOpenPaadDoc(d.id)}
-                            className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-ink font-medium"
-                          >
-                            Observar / Detalle
-                          </button>
-                          {role === 'UAP' && !d.pedApproved && d.state === 'ENVIADO_A_REVISION' && (
-                            <button
-                              onClick={() => onApproveUap(d.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-primary text-white font-semibold"
-                            >
-                              Aprobar UAP
-                            </button>
-                          )}
-                          {role === 'DIRECCION_CARRERA' && d.evalCareer === careerId && !d.discApproved && d.state === 'ENVIADO_A_REVISION' && (
-                            <button
-                              onClick={() => onApproveDir(d.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-primary text-white font-semibold"
-                            >
-                              Aprobar Dirección
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenPaadDoc(d.id)}
+                          className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          Ver PAAD
+                        </button>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted">
+                  <td colSpan={5} className="p-8 text-center text-muted">
                     No se encontraron PAADs con los filtros seleccionados.
                   </td>
                 </tr>

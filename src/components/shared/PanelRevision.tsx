@@ -45,6 +45,11 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
   const etiqueta = AREA_LABEL[area];
   const bloqueaFavorable = pendientes > 0;
   const informe = area === 'uap' ? 'Informe Pedagógico' : 'Informe Disciplinar';
+  // PAAD: sin informes ni doble conformidad. Una aprobación lo deja Aprobado y devolverlo exige observaciones ancladas.
+  const esPaad = tipo === 'PAAD';
+  const bloqueaObservar = esPaad && pendientes === 0;
+  const etiquetaAprobar = esPaad ? 'Aprobar PAAD' : APROBAR_INFORME[area];
+  const etiquetaObservar = esPaad ? 'Enviar con revisiones (Observado)' : 'Enviar con revisiones';
 
   const confirmar = () => {
     if (!confirmando) return;
@@ -68,7 +73,7 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
             Dictamen · {etiqueta.corto}
           </h2>
           <p className="mt-0.5 text-muted">
-            Emití el {etiqueta.dictamen} del {tipo}.{' '}
+            {esPaad ? 'Aprobá el PAAD u observalo: basta con la decisión de la UAP o de la Dirección de Carrera.' : `Emití el ${etiqueta.dictamen} del ${tipo}.`}{' '}
             {pendientes > 0 ? (
               <span className="font-medium text-amber-700 dark:text-amber-400">Tenés {pendientes} observación(es) anclada(s) sin subsanar.</span>
             ) : (
@@ -83,7 +88,9 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
           <p className="text-xs font-medium text-ink">
             {confirmando === 'OBSERVADO'
               ? `El ${tipo} vuelve al docente en estado Observado y se habilita su edición para corregir. ¿Confirmás?`
-              : `Se registra el ${etiqueta.dictamen} favorable. ¿Confirmás?`}
+              : esPaad
+                ? 'El PAAD queda Aprobado y se cierra su revisión. ¿Confirmás?'
+                : `Se registra el ${etiqueta.dictamen} favorable. ¿Confirmás?`}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={() => setConfirmando(null)} className={btnSecundario}>
@@ -91,7 +98,7 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
             </button>
             <button type="button" autoFocus onClick={confirmar} className={confirmando === 'OBSERVADO' ? btnObservar : btnAprobar}>
               {confirmando === 'OBSERVADO' ? <IconReturn className="h-4 w-4" /> : <IconCheck className="h-4 w-4" />}
-              {confirmando === 'OBSERVADO' ? 'Sí, enviar con revisiones' : `Sí, ${APROBAR_INFORME[area].toLowerCase()}`}
+              {confirmando === 'OBSERVADO' ? 'Sí, enviar con revisiones' : `Sí, ${etiquetaAprobar.toLowerCase()}`}
             </button>
           </div>
         </div>
@@ -100,11 +107,13 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
           <button
             type="button"
             onClick={() => setConfirmando('OBSERVADO')}
+            disabled={bloqueaObservar}
+            aria-describedby={bloqueaObservar ? idAyuda : undefined}
             title={`Devuelve el ${tipo} al docente con las observaciones`}
             className={btnObservar}
           >
             <IconReturn className="h-4 w-4" />
-            Enviar con revisiones
+            {etiquetaObservar}
           </button>
           <button
             type="button"
@@ -115,16 +124,18 @@ export function PanelRevision({ revision, tipo, variante = 'tarjeta' }: Props) {
             className={btnAprobar}
           >
             <IconCheck className="h-4 w-4" />
-            {APROBAR_INFORME[area]}
+            {etiquetaAprobar}
           </button>
         </div>
       )}
 
-      {!confirmando && (bloqueaFavorable || onAbrirInforme) && (
+      {!confirmando && (bloqueaFavorable || bloqueaObservar || onAbrirInforme) && (
         <p id={idAyuda} className="text-[11px] text-muted">
           {bloqueaFavorable
             ? 'Para aprobar, el docente debe subsanar tus observaciones. También podés eliminar las que cargaste por error.'
-            : `Al aprobar se abre el ${informe} con los datos del ${tipo} ya completados: revisalos y confirmá el envío.`}
+            : bloqueaObservar
+              ? 'Para enviar con revisiones, anclá al menos una observación en los apartados del PAAD.'
+              : `Al aprobar se abre el ${informe} con los datos del ${tipo} ya completados: revisalos y confirmá el envío.`}
         </p>
       )}
     </section>

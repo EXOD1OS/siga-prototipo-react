@@ -22,6 +22,7 @@ import {
   esEditablePorDocente,
   esReenvio,
   ESTADOS_EN_REVISION,
+  ESTADOS_REVISION_PAAD,
   finalizarRevision,
   observacionesPendientesDe,
   presentarDocumento,
@@ -199,7 +200,14 @@ export default function App() {
   };
 
   const canObserveDoc = (d: any) => {
-    if (!d || !ESTADOS_EN_REVISION.includes(d.state)) return false;
+    if (!d) return false;
+    // PAAD: sin doble conformidad. UAP o la Dirección evaluadora lo revisan en revisión u observado;
+    // una vez Aprobado ya no hay controles de revisión.
+    if (d.type === 'PAAD') {
+      if (!ESTADOS_REVISION_PAAD.includes(d.state)) return false;
+      return role === 'UAP' || (role === 'DIRECCION_CARRERA' && d.evalCareer === careerId);
+    }
+    if (!ESTADOS_EN_REVISION.includes(d.state)) return false;
     if (role === 'UAP') return !d.pedApproved;
     if (role === 'DIRECCION_CARRERA') {
       const cid = d.type === 'PAAC' ? asigContext(d.asignaturaId).carrera?.id : d.evalCareer;
@@ -233,9 +241,11 @@ export default function App() {
     showToast(
       resultado === 'OBSERVADO'
         ? `${doc.type} devuelto al docente con observaciones: ya puede corregirlo.`
-        : ['APROBADO_PLENO', 'APROBADO'].includes(next.state)
-          ? `Dictamen ${quien} favorable. Ambos dictámenes son favorables: ${doc.type} evaluado favorablemente.`
-          : `Dictamen ${quien} favorable registrado.`,
+        : doc.type === 'PAAD'
+          ? `PAAD aprobado por ${area === 'uap' ? 'la UAP' : 'la Dirección de Carrera'}.`
+          : next.state === 'APROBADO_PLENO'
+            ? `Dictamen ${quien} favorable. Ambos dictámenes son favorables: ${doc.type} evaluado favorablemente.`
+            : `Dictamen ${quien} favorable registrado.`,
       resultado === 'OBSERVADO' ? 'warning' : 'success'
     );
   };
@@ -362,19 +372,15 @@ export default function App() {
             <PaadsListView
               paads={paads}
               role={role}
-              careerId={careerId}
               carreras={S.carreras}
               equiposCatedra={S.equiposCatedra}
               cycle={S.cycle}
               fullName={fullName}
               asigContext={asigContext}
-              onOpenPaadModal={(paadId) => setModalPaadId(paadId)}
               onOpenPaadDoc={(paadId) => {
                 setActiveDocId(paadId);
                 setPage('doc');
               }}
-              onApproveUap={(paadId) => finalizarRevisionDoc(paadId, 'FAVORABLE')}
-              onApproveDir={(paadId) => finalizarRevisionDoc(paadId, 'FAVORABLE')}
               onChangeEvalCareer={(paadId, newCarId) => {
                 setS((prev) => ({
                   ...prev,
@@ -432,7 +438,9 @@ export default function App() {
                 showToast(
                   reenvio
                     ? `${currentDoc.type} subsanado y presentado nuevamente: queda en revisión.`
-                    : `${currentDoc.type} presentado: queda en revisión de UAP y Dirección.`
+                    : currentDoc.type === 'PAAD'
+                      ? 'PAAD presentado: queda en revisión de la UAP o la Dirección de Carrera.'
+                      : 'PAAC presentado: queda en revisión de UAP y Dirección.'
                 );
               }}
               revision={revisionPara(currentDoc)}
@@ -621,16 +629,11 @@ export default function App() {
           })}
           docenteName={fullName(modalPaad.owner)}
           carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.sigla || ''}`}
-          revision={revisionPara(modalPaad)}
-          onAbrirDetalle={
-            canObserveDoc(modalPaad)
-              ? () => {
-                  setActiveDocId(modalPaad.id);
-                  setModalPaadId(null);
-                  setPage('doc');
-                }
-              : undefined
-          }
+          onAbrirDetalle={() => {
+            setActiveDocId(modalPaad.id);
+            setModalPaadId(null);
+            setPage('doc');
+          }}
           onClose={() => setModalPaadId(null)}
         />
       )}
