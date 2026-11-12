@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { APARTADOS_PAAD, CAMPOS_ASPECTOS, TITULO_DISTRIBUCION } from '../../lib/paad';
+import { APARTADOS_PAAD, CAMPOS_ASPECTOS, NUMERO_DISTRIBUCION, TITULO_DISTRIBUCION } from '../../lib/paad';
 import {
   ACTIVIDADES_PAAD,
   ACTIVIDAD_LABEL,
@@ -122,7 +122,9 @@ function Hoja({ aspectos, contenido, impresion = false }: Props & { impresion?: 
 
       {/* Distribución horaria */}
       <section className="mt-6 break-inside-avoid-page">
-        <p className="font-bold">{TITULO_DISTRIBUCION}</p>
+        <p className="font-bold">
+          {NUMERO_DISTRIBUCION}) {TITULO_DISTRIBUCION}
+        </p>
         <table className="mt-2 w-full border-collapse border border-black text-center text-[12px]">
           <thead>
             <tr>

@@ -4,8 +4,7 @@ import { Header, type NotificationItem } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { PaadModal } from './components/shared/PaadModal';
 import { Toast, type ToastTone } from './components/shared/Toast';
-import { armarAspectosGenerales } from './lib/paad';
-import { paadVacio } from './types/paad';
+import { catedraInicial, catedrasDocente, getDynamicPaadHeader, type FuentePaad } from './lib/paad';
 import { PlanificacionesList } from './components/views/PlanificacionesList';
 import { PaadsListView } from './components/views/PaadsListView';
 import { DocumentFormView } from './components/views/DocumentFormView';
@@ -37,7 +36,10 @@ export default function App() {
   const [careerId, setCareerId] = useState('car-isi');
   const [page, setPage] = useState('home');
   const [activeDocId, setActiveDocId] = useState('paac-1');
-  const [modalPaadId, setModalPaadId] = useState<string | null>(null);
+  // Vista rápida de un PAAD: guarda desde qué asignatura (PAAC) se abrió para proyectar sus Aspectos Generales.
+  const [modalPaadState, setModalPaadState] = useState<{ paadId: string; asigId?: string } | null>(null);
+  // Contexto con el que se abre el formulario de un PAAD (cátedra de origen o carrera filtrada en la bandeja).
+  const [paadContexto, setPaadContexto] = useState<{ asignaturaId?: string | null; carreraId?: string | null } | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string; tone: ToastTone } | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
@@ -171,6 +173,7 @@ export default function App() {
   };
 
   const handleNavigate = (targetPage: string) => {
+    setPaadContexto(null);
     if (targetPage === 'mi-paad') {
       const mp = S.docs.find((d) => d.type === 'PAAD' && d.owner === uid);
       if (mp) {
@@ -262,7 +265,7 @@ export default function App() {
       onAbrirInforme:
         d.type === 'PAAC'
           ? () => {
-              setModalPaadId(null);
+              setModalPaadState(null);
               setActiveDocId(d.id);
               setPage('report');
             }
@@ -273,7 +276,7 @@ export default function App() {
   const paacs = S.docs.filter((d) => d.type === 'PAAC');
   const paads = S.docs.filter((d) => d.type === 'PAAD');
   const currentDoc = docBy(activeDocId);
-  const modalPaad = modalPaadId ? docBy(modalPaadId) : null;
+  const modalPaad = modalPaadState ? docBy(modalPaadState.paadId) : null;
 
   const toastEl = toast && <Toast key={toast.id} message={toast.msg} tone={toast.tone} onDone={() => setToast(null)} />;
 
@@ -377,7 +380,8 @@ export default function App() {
               cycle={S.cycle}
               fullName={fullName}
               asigContext={asigContext}
-              onOpenPaadDoc={(paadId) => {
+              onOpenPaadDoc={(paadId, carreraId) => {
+                setPaadContexto(carreraId ? { carreraId } : null);
                 setActiveDocId(paadId);
                 setPage('doc');
               }}
@@ -478,7 +482,12 @@ export default function App() {
                 setActiveDocId(id);
                 setPage('report');
               }}
-              onOpenPaadModal={(paadId: string) => setModalPaadId(paadId)}
+              onOpenPaadModal={(paadId: string, asigId?: string) => setModalPaadState({ paadId, asigId })}
+              paadContexto={{
+                // La Dirección ve por defecto el encabezado de su propia carrera.
+                ...(role === 'DIRECCION_CARRERA' ? { carreraId: careerId } : {}),
+                ...paadContexto,
+              }}
             />
           )}
 
@@ -616,28 +625,32 @@ export default function App() {
       </div>
 
       {/* MODAL PARA VER EL PAAD PRESENTADO DE UN DOCENTE */}
-      {modalPaad && (
-        <PaadModal
-          paad={modalPaad}
-          aspectos={armarAspectosGenerales({
-            contenido: modalPaad.paad ?? paadVacio(),
-            ownerId: modalPaad.owner,
-            ciclo: modalPaad.cycle,
-            usuarios: S.usuarios,
-            equipos: S.equiposCatedra,
-            asigContext,
-          })}
-          docenteName={fullName(modalPaad.owner)}
-          carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.sigla || ''}`}
-          onAbrirDetalle={() => {
-            setActiveDocId(modalPaad.id);
-            setModalPaadId(null);
-            setPage('doc');
-          }}
-          onClose={() => setModalPaadId(null)}
-        />
-      )}
-
+      {modalPaad && modalPaadState && (() => {
+        // Un PAAD por ciclo: se proyecta sobre la asignatura desde la que se abrió (o la inicial del docente).
+        const fuente: FuentePaad = { ciclo: modalPaad.cycle, usuarios: S.usuarios, equipos: S.equiposCatedra, asigContext };
+        const catedras = catedrasDocente(modalPaad.owner, fuente);
+        return (
+          <PaadModal
+            key={`${modalPaad.id}-${modalPaadState.asigId ?? ''}`}
+            paad={modalPaad}
+            catedras={catedras}
+            catedraInicial={catedraInicial(catedras, {
+              asignaturaId: modalPaadState.asigId,
+              carreraId: role === 'DIRECCION_CARRERA' ? careerId : null,
+            })}
+            aspectosDe={(asigId) => getDynamicPaadHeader(modalPaad.owner, asigId, fuente)}
+            docenteName={fullName(modalPaad.owner)}
+            carreraEvalName={`Dirección ${carreraBy(modalPaad.evalCareer)?.sigla || ''}`}
+            onAbrirDetalle={() => {
+              setPaadContexto(modalPaadState.asigId ? { asignaturaId: modalPaadState.asigId } : null);
+              setActiveDocId(modalPaad.id);
+              setModalPaadState(null);
+              setPage('doc');
+            }}
+            onClose={() => setModalPaadState(null)}
+          />
+        );
+      })()}
       <CambiarPasswordModal
         open={passwordModalOpen}
         activeUserName={activeUserName}

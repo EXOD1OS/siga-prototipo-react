@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { CAMPOS_ASPECTOS } from '../../lib/paad';
+import { CAMPOS_ASPECTOS, FUNCION_CATEDRA, type CatedraPaad } from '../../lib/paad';
 import {
   ACTIVIDADES_PAAD,
   ACTIVIDAD_LABEL,
@@ -312,5 +312,114 @@ export function FichaAspectos({ aspectos }: { aspectos: AspectosGeneralesPaad })
         </div>
       ))}
     </dl>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Proyección por cátedra: el mismo PAAD se presenta con los Aspectos Generales de cada asignatura
+// ---------------------------------------------------------------------------
+
+const REGIMEN_CORTO: Record<string, string> = { '1C': '1.º cuatrimestre', '2C': '2.º cuatrimestre', ANUAL: 'Anual' };
+
+/** Selector de la cátedra con la que se proyectan los Aspectos Generales. */
+export function SelectorCatedraPaad({
+  id,
+  etiqueta,
+  catedras,
+  value,
+  onChange,
+}: {
+  id: string;
+  etiqueta: string;
+  catedras: CatedraPaad[];
+  value: string | null;
+  onChange: (asignaturaId: string) => void;
+}) {
+  if (catedras.length === 0) {
+    return <p className="text-[11px] italic text-muted">El docente no integra equipos de cátedra en el ciclo.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+      <label htmlFor={id} className="text-[11px] font-semibold text-muted">
+        {etiqueta}
+      </label>
+      <select
+        id={id}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={catedras.length === 1}
+        className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-ink outline-none transition focus:border-primary disabled:cursor-default disabled:opacity-90"
+      >
+        {catedras.map((c) => (
+          <option key={c.asignaturaId} value={c.asignaturaId}>
+            {c.ctx.asig?.nombre ?? c.asignaturaId} ({c.ctx.carrera?.sigla ?? '—'})
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Todas las asignaturas que atiende el docente en el ciclo, con su cargo y función en cada una. */
+export function TablaCatedrasPaad({
+  catedras,
+  activa,
+  onElegir,
+}: {
+  catedras: CatedraPaad[];
+  activa: string | null;
+  onElegir?: (asignaturaId: string) => void;
+}) {
+  if (catedras.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-xs">
+        <caption className="sr-only">Asignaturas atendidas en el ciclo</caption>
+        <thead>
+          <tr className="bg-background text-[11px] text-muted">
+            <th scope="col" className="w-[12%] px-3 py-2 font-semibold">Carrera</th>
+            <th scope="col" className="w-[30%] px-3 py-2 font-semibold">Asignatura</th>
+            <th scope="col" className="w-[30%] px-3 py-2 font-semibold">Cargo / Función</th>
+            <th scope="col" className="w-[14%] px-3 py-2 font-semibold">Régimen</th>
+            <th scope="col" className="w-[14%] px-3 py-2 text-right font-semibold">Horas</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {catedras.map((c) => {
+            const esActiva = c.asignaturaId === activa;
+            return (
+              <tr key={c.asignaturaId} className={esActiva ? 'bg-soft' : undefined} aria-current={esActiva ? 'true' : undefined}>
+                <td className="px-3 py-2 font-semibold text-primary" title={c.ctx.carrera?.nombre}>
+                  {c.ctx.carrera?.sigla ?? '—'}
+                </td>
+                <td className="min-w-0 px-3 py-2">
+                  {onElegir && !esActiva ? (
+                    <button
+                      type="button"
+                      onClick={() => onElegir(c.asignaturaId)}
+                      className="block max-w-full truncate text-left font-medium text-ink underline-offset-2 hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      title={`Ver los Aspectos Generales para ${c.ctx.asig?.nombre}`}
+                    >
+                      {c.ctx.asig?.nombre ?? c.asignaturaId}
+                    </button>
+                  ) : (
+                    <span className="block truncate font-medium text-ink">{c.ctx.asig?.nombre ?? c.asignaturaId}</span>
+                  )}
+                  <span className="block truncate text-[10px] text-muted">{c.ctx.plan?.ordenanza}</span>
+                </td>
+                <td className="min-w-0 px-3 py-2">
+                  <span className="block truncate text-ink">{c.eq.cargo}</span>
+                  <span className={`block truncate text-[10px] ${c.eq.esResponsable ? 'font-semibold text-primary' : 'text-muted'}`}>
+                    {c.eq.esResponsable ? FUNCION_CATEDRA.responsable : FUNCION_CATEDRA.integrante}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-ink">{c.ctx.asig ? (REGIMEN_CORTO[c.ctx.asig.regimenDictado] ?? c.ctx.asig.regimenDictado) : '—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink">{c.ctx.asig ? `${c.ctx.asig.horasTotales} hs` : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -39,17 +39,21 @@ export type ListaPaad =
   | 'gestion'
   | 'otras';
 
+/**
+ * Cuerpo del PAAD: apartados 1) a 7) y distribución horaria. Es único por docente y ciclo lectivo
+ * y se comparte entre todas las cátedras en las que participa. No guarda una cátedra: los Aspectos
+ * Generales se proyectan en cada consulta según la asignatura (ver getDynamicPaadHeader).
+ */
 export interface PaadContenido {
-  /** Cátedra de referencia para los Aspectos Generales. */
-  asignaturaId: string | null;
   listas: Record<ListaPaad, string[]>;
   horas: MatrizHoras;
 }
 
-/** Datos de la ficha "Aspectos Generales" (autocompletados, solo lectura). */
+/** Datos de la ficha "Aspectos Generales" (proyectados según la cátedra, solo lectura). */
 export interface AspectosGeneralesPaad {
   profesorACargo: string;
   presentadoPor: string;
+  dni: string;
   anio: string;
   sede: string;
   departamento: string;
@@ -58,6 +62,11 @@ export interface AspectosGeneralesPaad {
   asignatura: string;
   curso: string;
   regimen: string;
+  creditoHorario: string;
+  /** Cargo del docente en esa cátedra (Equipo de Cátedra). */
+  cargo: string;
+  /** Función en la cátedra: responsable o integrante del equipo. */
+  funcion: string;
 }
 
 export function matrizVacia(): MatrizHoras {
@@ -65,9 +74,8 @@ export function matrizVacia(): MatrizHoras {
   return { ensenanza: fila(), investigacion: fila(), extension: fila(), formacion: fila(), gestion: fila() };
 }
 
-export function paadVacio(asignaturaId: string | null = null): PaadContenido {
+export function paadVacio(): PaadContenido {
   return {
-    asignaturaId,
     listas: {
       cursos: [],
       capacitaciones: [],

@@ -9,8 +9,11 @@ interface Props {
   cycle: number;
   fullName: (id: string) => string;
   asigContext: (id: string) => any;
-  /** Abre el formulario completo del PAAD: allí UAP o Dirección lo observan o lo aprueban. */
-  onOpenPaadDoc: (paadId: string) => void;
+  /**
+   * Abre el formulario completo del PAAD (allí UAP o Dirección lo observan o lo aprueban).
+   * Con una carrera filtrada, los Aspectos Generales se proyectan sobre una cátedra de esa carrera.
+   */
+  onOpenPaadDoc: (paadId: string, carreraId?: string) => void;
   onChangeEvalCareer: (paadId: string, newCareerId: string) => void;
 }
 
@@ -49,7 +52,7 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
         </p>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
+      <div className="w-full bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
         {/* Barra de filtros */}
         <div className="p-4 border-b border-border grid grid-cols-1 sm:grid-cols-3 gap-3 bg-background/50">
           <input
@@ -87,14 +90,15 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          {/* table-fixed + anchos por columna (suman 100%): los encabezados no se mueven al filtrar ni con 0 resultados. */}
+          <table className="w-full table-fixed min-w-[900px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border text-[11px]">
-                <th className="p-4">Docente</th>
-                <th className="p-4">Cátedras en el Ciclo</th>
-                <th className="p-4">Dirección Evaluadora</th>
-                <th className="p-4">Estado PAAD</th>
-                <th className="p-4 text-right">Acciones</th>
+                <th scope="col" className="w-[22%] p-4">Docente</th>
+                <th scope="col" className="w-[32%] p-4">Cátedras en el Ciclo</th>
+                <th scope="col" className="w-[18%] p-4">Dirección Evaluadora</th>
+                <th scope="col" className="w-[16%] p-4">Estado PAAD</th>
+                <th scope="col" className="w-[12%] p-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -104,24 +108,26 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
                   const evalCar = carreras.find((c) => c.id === d.evalCareer);
                   return (
                     <tr key={d.id} className="hover:bg-background/60 transition">
-                      <td className="p-4 font-bold text-ink">{fullName(d.owner)}</td>
-                      <td className="p-4 space-y-1">
+                      <td className="min-w-0 p-4 font-bold text-ink">
+                        <span className="block break-words">{fullName(d.owner)}</span>
+                      </td>
+                      <td className="min-w-0 p-4 space-y-1">
                         {misEq.map((eq) => {
                           const c = asigContext(eq.asignaturaId);
                           return (
-                            <div key={eq.id} className="text-[11px]">
+                            <div key={eq.id} className="break-words text-[11px]">
                               <span className="font-semibold text-primary">{c.carrera?.sigla}</span> · {c.asig?.nombre} ({eq.cargo})
                             </div>
                           );
                         })}
                       </td>
-                      <td className="p-4">
+                      <td className="min-w-0 p-4">
                         {role === 'ADMINISTRADOR' && d.state === 'BORRADOR' ? (
                           <select
                             value={d.evalCareer}
                             onChange={(e) => onChangeEvalCareer(d.id, e.target.value)}
                             aria-label={`Dirección evaluadora del PAAD de ${fullName(d.owner)}`}
-                            className="rounded-lg bg-background border border-border px-2.5 py-1 text-xs text-ink"
+                            className="w-full max-w-full rounded-lg bg-background border border-border px-2.5 py-1 text-xs text-ink"
                           >
                             {carreras.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -130,7 +136,7 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
                             ))}
                           </select>
                         ) : (
-                          <span className="px-2.5 py-1 rounded bg-soft text-primary font-semibold text-[11px]">Dirección {evalCar?.sigla}</span>
+                          <span className="inline-block max-w-full truncate px-2.5 py-1 rounded bg-soft text-primary font-semibold text-[11px]">Dirección {evalCar?.sigla}</span>
                         )}
                       </td>
                       <td className="p-4">
@@ -139,7 +145,7 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
                       <td className="p-4 text-right">
                         <button
                           type="button"
-                          onClick={() => onOpenPaadDoc(d.id)}
+                          onClick={() => onOpenPaadDoc(d.id, filterCareer !== 'ALL' ? filterCareer : undefined)}
                           className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         >
                           Ver PAAD

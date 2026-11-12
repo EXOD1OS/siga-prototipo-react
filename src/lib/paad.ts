@@ -137,6 +137,8 @@ export const APARTADOS_PAAD: ApartadoDef[] = [
   },
 ];
 
+/** Punto 8) del PAAD: sigue a los apartados 1) a 7) con la misma numeración. */
+export const NUMERO_DISTRIBUCION = APARTADOS_PAAD.length + 1;
 export const TITULO_DISTRIBUCION = 'DISTRIBUCIÓN HORARIA DE SUS ACTIVIDADES';
 
 const CURSO: Record<number, string> = { 1: 'Primer Año', 2: 'Segundo Año', 3: 'Tercer Año', 4: 'Cuarto Año', 5: 'Quinto Año', 6: 'Sexto Año' };
@@ -145,40 +147,85 @@ const REGIMEN: Record<string, string> = { '1C': 'Primer Cuatrimestre', '2C': 'Se
 /** "Lastra Mariana Soledad" (apellido primero, como en el documento oficial). */
 export const nombreOficial = (u: Pick<Usuario, 'nombre' | 'apellido'> | undefined) => (u ? `${u.apellido} ${u.nombre}` : '');
 
-/** Arma la ficha de Aspectos Generales a partir de la cátedra de referencia y del docente. */
-export function armarAspectosGenerales(opts: {
-  contenido: PaadContenido;
-  ownerId: string;
+/** Lo que necesita la proyección de los Aspectos Generales (estado de la app). */
+export interface FuentePaad {
   ciclo: number;
   usuarios: Usuario[];
   equipos: EquipoCatedra[];
   asigContext: (id: string) => AsigContext;
-}): AspectosGeneralesPaad {
-  const { contenido, ownerId, ciclo, usuarios, equipos, asigContext } = opts;
-  const userBy = (id: string) => usuarios.find((u) => u.id === id);
-  const ctx = contenido.asignaturaId ? asigContext(contenido.asignaturaId) : null;
-  const equipo = contenido.asignaturaId
-    ? equipos.filter((e) => e.asignaturaId === contenido.asignaturaId && e.cicloLectivo === ciclo)
-    : [];
+}
+
+/** Una cátedra del docente en el ciclo, con su designación y su contexto académico. */
+export interface CatedraPaad {
+  asignaturaId: string;
+  eq: EquipoCatedra;
+  ctx: AsigContext;
+  /** "ISI · Programación I" para selectores. */
+  label: string;
+}
+
+export const FUNCION_CATEDRA = {
+  responsable: 'Docente Responsable de Cátedra (Titular / a cargo)',
+  integrante: 'Integrante del Equipo de Cátedra',
+} as const;
+
+/** Cátedras en las que participa el docente en el ciclo (primero aquellas de las que es responsable). */
+export function catedrasDocente(docenteId: string, f: FuentePaad): CatedraPaad[] {
+  return f.equipos
+    .filter((e) => e.docenteId === docenteId && e.cicloLectivo === f.ciclo)
+    .sort((a, b) => Number(b.esResponsable) - Number(a.esResponsable))
+    .map((eq) => {
+      const ctx = f.asigContext(eq.asignaturaId);
+      return { asignaturaId: eq.asignaturaId, eq, ctx, label: `${ctx.carrera?.sigla ?? ''} · ${ctx.asig?.nombre ?? eq.asignaturaId}` };
+    });
+}
+
+/**
+ * Cátedra con la que se abre el PAAD: la pedida (si el docente la integra), si no la primera
+ * de la carrera preferida (Dirección o filtro de la bandeja) y, en último caso, donde es responsable.
+ */
+export function catedraInicial(catedras: CatedraPaad[], opts: { asignaturaId?: string | null; carreraId?: string | null } = {}): string | null {
+  if (opts.asignaturaId && catedras.some((c) => c.asignaturaId === opts.asignaturaId)) return opts.asignaturaId;
+  const deCarrera = opts.carreraId ? catedras.find((c) => c.ctx.carrera?.id === opts.carreraId) : undefined;
+  return (deCarrera ?? catedras[0])?.asignaturaId ?? null;
+}
+
+/**
+ * Aspectos Generales del PAAD proyectados para una cátedra: sede, departamento, carrera, plan,
+ * asignatura, curso, régimen y crédito horario salen de la asignatura; cargo y función, de la
+ * designación del docente en ese Equipo de Cátedra. Sin cátedra, solo quedan los datos del docente.
+ */
+export function getDynamicPaadHeader(docenteId: string, contextAsigId: string | null | undefined, f: FuentePaad): AspectosGeneralesPaad {
+  const userBy = (id: string) => f.usuarios.find((u) => u.id === id);
+  const docente = userBy(docenteId);
+  const ctx = contextAsigId ? f.asigContext(contextAsigId) : null;
+  const equipo = contextAsigId ? f.equipos.filter((e) => e.asignaturaId === contextAsigId && e.cicloLectivo === f.ciclo) : [];
+  const eq = equipo.find((e) => e.docenteId === docenteId);
   const aCargo = equipo.find((e) => e.esResponsable) ?? equipo.find((e) => e.cargo === 'Profesor Titular');
+  const asig = ctx?.asig;
 
   return {
     profesorACargo: aCargo ? nombreOficial(userBy(aCargo.docenteId)) : '',
-    presentadoPor: nombreOficial(userBy(ownerId)),
-    anio: String(ciclo),
+    presentadoPor: nombreOficial(docente),
+    dni: docente?.dni ?? '',
+    anio: String(f.ciclo),
     sede: ctx?.sede?.nombre.replace(/^Sede Regional /, 'Delegación ').replace(/^Sede /, '') ?? '',
     departamento: ctx?.depto?.nombre.split(' (')[0] ?? (ctx ? '—' : ''),
     carrera: ctx?.carrera?.nombre ?? '',
     planEstudio: ctx?.plan?.ordenanza ?? '',
-    asignatura: ctx?.asig?.nombre ?? '',
-    curso: ctx?.asig ? (CURSO[ctx.asig.anoCursada] ?? `${ctx.asig.anoCursada}.º Año`) : '',
-    regimen: ctx?.asig ? (REGIMEN[ctx.asig.regimenDictado] ?? ctx.asig.regimenDictado) : '',
+    asignatura: asig?.nombre ?? '',
+    curso: asig ? (CURSO[asig.anoCursada] ?? `${asig.anoCursada}.º Año`) : '',
+    regimen: asig ? (REGIMEN[asig.regimenDictado] ?? asig.regimenDictado) : '',
+    creditoHorario: asig ? `${asig.horasSemanales} hs semanales · ${asig.horasTotales} hs totales` : '',
+    cargo: eq?.cargo ?? '',
+    funcion: eq ? (eq.esResponsable ? FUNCION_CATEDRA.responsable : FUNCION_CATEDRA.integrante) : '',
   };
 }
 
 export const CAMPOS_ASPECTOS: { key: keyof AspectosGeneralesPaad; label: string }[] = [
   { key: 'profesorACargo', label: 'Profesor Titular / a cargo' },
   { key: 'presentadoPor', label: 'Plan presentado por' },
+  { key: 'dni', label: 'DNI' },
   { key: 'anio', label: 'Año' },
   { key: 'sede', label: 'Sede / Delegación' },
   { key: 'departamento', label: 'Departamento Académico' },
@@ -187,17 +234,18 @@ export const CAMPOS_ASPECTOS: { key: keyof AspectosGeneralesPaad; label: string 
   { key: 'asignatura', label: 'Asignatura' },
   { key: 'curso', label: 'Curso' },
   { key: 'regimen', label: 'Régimen' },
+  { key: 'creditoHorario', label: 'Crédito horario' },
+  { key: 'cargo', label: 'Cargo en la cátedra' },
+  { key: 'funcion', label: 'Función en la cátedra' },
 ];
-
 export const totalHoras = (c: PaadContenido) =>
   ACTIVIDADES_PAAD.reduce((acc, a) => acc + DIAS_PAAD.reduce((s, d) => s + horasDe(c.horas[a][d]), 0), 0);
 
 /** Requisitos mínimos para presentar el PAAD. */
 export function validarPaad(c: PaadContenido, comments: ObservacionDoc[]): string[] {
   const problemas: string[] = [];
-  if (!c.asignaturaId) problemas.push('Seleccioná la cátedra de referencia para los Aspectos Generales.');
   if (c.listas.cursos.length === 0) problemas.push('1) a) Cargá al menos un curso o asignatura atendido.');
-  if (totalHoras(c) === 0) problemas.push('Distribución horaria: cargá las horas semanales de tus actividades.');
+  if (totalHoras(c) === 0) problemas.push(`${NUMERO_DISTRIBUCION}) Distribución horaria: cargá las horas semanales de tus actividades.`);
   const pendientes = comments.filter((o) => !o.resolved).length;
   if (pendientes > 0) problemas.push(`Hay ${pendientes} observación(es) sin marcar como subsanadas.`);
   return problemas;

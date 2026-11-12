@@ -515,10 +515,7 @@ export function createInitialData() {
   }
 
   // ---- PAAD (Anexo III, Ord. 171/19) ----
-  const catedraDeReferencia = (docenteId: string) => {
-    const propios = equiposCatedra.filter((e) => e.docenteId === docenteId && e.cicloLectivo === 2026);
-    return (propios.find((e) => e.esResponsable) ?? propios[0])?.asignaturaId ?? null;
-  };
+  // El cuerpo del PAAD es único por docente y ciclo: no se ata a una cátedra.
   const cursosDe = (docenteId: string) =>
     equiposCatedra
       .filter((e) => e.docenteId === docenteId && e.cicloLectivo === 2026)
@@ -530,7 +527,6 @@ export function createInitialData() {
 
   /** PAAD de ejemplo real: Lastra Mariana Soledad, Análisis Matemático (Ord. N° 231/2023). */
   const paadLastra: PaadContenido = {
-    asignaturaId: 'asig-am',
     listas: {
       cursos: ['Análisis Matemático – Primer Año de Ingeniería en Sistemas de Información – comisiones A y B (teoría y práctica).'],
       capacitaciones: [
@@ -578,7 +574,6 @@ export function createInitialData() {
 
   /** PAAD genérico para el resto de los docentes de prueba. */
   const paadGenerico = (docenteId: string): PaadContenido => ({
-    asignaturaId: catedraDeReferencia(docenteId),
     listas: {
       ...paadVacio().listas,
       cursos: cursosDe(docenteId),

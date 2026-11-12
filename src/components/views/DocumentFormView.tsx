@@ -1,6 +1,6 @@
 import { PaadEditor } from '../paad/PaadEditor';
 import { PaacEditor, type IntegrantePaad } from '../paac/PaacEditor';
-import { armarAspectosGenerales, nombreOficial } from '../../lib/paad';
+import { catedraInicial, catedrasDocente, getDynamicPaadHeader, nombreOficial, type FuentePaad } from '../../lib/paad';
 import { armarAspectosPaac, paacDesdeDatosAnteriores } from '../../lib/paac';
 import { paadVacio, type PaadContenido } from '../../types/paad';
 import type { PaacContenido } from '../../types/paac';
@@ -31,7 +31,10 @@ interface DocumentFormViewProps {
   /** UAP / Dirección / Admin eliminan una observación propia. */
   onDeleteObs: (obsId: string) => void;
   onOpenReport: (id: string) => void;
-  onOpenPaadModal: (paadId: string) => void;
+  /** Abre la vista rápida de un PAAD proyectado sobre la asignatura indicada. */
+  onOpenPaadModal: (paadId: string, asignaturaId?: string) => void;
+  /** PAAD: cátedra o carrera con la que abrir la proyección de los Aspectos Generales. */
+  paadContexto?: { asignaturaId?: string | null; carreraId?: string | null };
   /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa este documento). */
   revision: InfoRevision | null;
 }
@@ -58,27 +61,27 @@ export function DocumentFormView({
   onDeleteObs,
   onOpenReport,
   onOpenPaadModal,
+  paadContexto,
   revision,
 }: DocumentFormViewProps) {
   if (d.type === 'PAAD') {
-    const misEquipos = S.equiposCatedra.filter((e) => e.docenteId === d.owner && e.cicloLectivo === d.cycle);
-    const catedras = misEquipos.map((e) => {
-      const c = asigContext(e.asignaturaId);
-      return { id: e.asignaturaId, label: `${c.carrera?.sigla ?? ''} · ${c.asig?.nombre ?? e.asignaturaId}` };
-    });
-    // Por defecto, la cátedra donde es responsable (o la primera).
-    const porDefecto = misEquipos.find((e) => e.esResponsable)?.asignaturaId ?? catedras[0]?.id ?? null;
-    const contenido = d.paad ?? paadVacio(porDefecto);
+    // Un solo PAAD por ciclo; los Aspectos Generales se proyectan sobre cada cátedra del docente.
+    const fuente: FuentePaad = { ciclo: d.cycle, usuarios: S.usuarios, equipos: S.equiposCatedra, asigContext };
+    const catedras = catedrasDocente(d.owner, fuente);
+    const contenido = d.paad ?? paadVacio();
     return (
       <PaadEditor
+        key={`${d.id}-${paadContexto?.asignaturaId ?? ''}-${paadContexto?.carreraId ?? ''}`}
         d={{ ...d, paad: contenido }}
         docenteNombre={fullName(d.owner)}
         role={role}
         canEdit={canEdit}
         canSubmit={canSubmit}
         canObserve={canObserve}
-        aspectos={armarAspectosGenerales({ contenido, ownerId: d.owner, ciclo: d.cycle, usuarios: S.usuarios, equipos: S.equiposCatedra, asigContext })}
         catedras={catedras}
+        catedraInicial={catedraInicial(catedras, paadContexto)}
+        aspectosDe={(asigId) => getDynamicPaadHeader(d.owner, asigId, fuente)}
+        esPropio={role.startsWith('DOCENTE') && d.owner === uid}
         revision={revision}
         onBack={onBack}
         onUpdatePaad={onUpdatePaad}
@@ -128,7 +131,7 @@ export function DocumentFormView({
       revision={revision}
       onBack={onBack}
       onOpenReport={() => onOpenReport(d.id)}
-      onOpenPaadModal={onOpenPaadModal}
+      onOpenPaadModal={(paadId) => onOpenPaadModal(paadId, d.asignaturaId)}
       onUpdatePaac={onUpdatePaac}
       onSaveDraft={onSaveDraft}
       onSubmitDoc={onSubmitDoc}

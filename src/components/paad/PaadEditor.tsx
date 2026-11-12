@@ -1,13 +1,14 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
+import { IconDocs } from '../layout/icons';
 import { AvisoEstado, avisoDeDocumento } from '../shared/AvisoEstado';
 import { BadgeObservaciones, BarraPresentacion } from '../shared/EdicionDocumento';
 import { PanelRevision, type InfoRevision } from '../shared/PanelRevision';
 import { esReenvio } from '../../lib/revision';
 import { ObservationFieldWrapper } from '../shared/ObservationFieldWrapper';
-import { FichaAspectos, InfoTip, ListaItems, MatrizHorasPaad } from './CamposPaad';
+import { FichaAspectos, InfoTip, ListaItems, MatrizHorasPaad, SelectorCatedraPaad, TablaCatedrasPaad } from './CamposPaad';
 import { BotonImprimir, PaadDocumentoOficial } from './PaadDocumentoOficial';
-import { APARTADOS_PAAD, TITULO_DISTRIBUCION, totalHoras, validarPaad } from '../../lib/paad';
+import { APARTADOS_PAAD, NUMERO_DISTRIBUCION, TITULO_DISTRIBUCION, totalHoras, validarPaad, type CatedraPaad } from '../../lib/paad';
 import { paadVacio, type AspectosGeneralesPaad, type ListaPaad, type PaadContenido } from '../../types/paad';
 import type { DocumentoEditable } from '../../types/planificacion';
 
@@ -18,9 +19,14 @@ interface PaadEditorProps {
   canEdit: boolean;
   canSubmit: boolean;
   canObserve: boolean;
-  aspectos: AspectosGeneralesPaad;
-  /** Cátedras del docente en el ciclo, para elegir la de referencia. */
-  catedras: { id: string; label: string }[];
+  /** Cátedras del docente en el ciclo: el mismo PAAD se proyecta en cada una. */
+  catedras: CatedraPaad[];
+  /** Cátedra con la que se abre la proyección (contexto de origen o la de su Dirección). */
+  catedraInicial: string | null;
+  /** Aspectos Generales proyectados para una cátedra (ver getDynamicPaadHeader). */
+  aspectosDe: (asignaturaId: string | null) => AspectosGeneralesPaad;
+  /** El docente está viendo su propio PAAD ("Mi PAAD Anual"). */
+  esPropio: boolean;
   /** Cierre de revisión para UAP / Dirección (null si la sesión no revisa). */
   revision: InfoRevision | null;
   onBack: () => void;
@@ -35,7 +41,7 @@ interface PaadEditorProps {
 
 type Vista = 'form' | 'preview';
 /** Índice de observaciones: 0 = Aspectos generales, 1–7 = apartados, 8 = distribución horaria. */
-const SEC_HORAS = 8;
+const SEC_HORAS = NUMERO_DISTRIBUCION;
 
 export function PaadEditor({
   d,
@@ -44,8 +50,10 @@ export function PaadEditor({
   canEdit,
   canSubmit,
   canObserve,
-  aspectos,
   catedras,
+  catedraInicial,
+  aspectosDe,
+  esPropio,
   revision,
   onBack,
   onUpdatePaad,
@@ -61,7 +69,13 @@ export function PaadEditor({
   const problemasRef = useRef<HTMLDivElement>(null);
   const uid = useId();
 
-  const contenido = d.paad ?? paadVacio(catedras[0]?.id ?? null);
+  const contenido = d.paad ?? paadVacio();
+  // Cátedra con la que se proyectan los Aspectos Generales; los apartados 1) a 8) no cambian.
+  const [asigVista, setAsigVista] = useState<string | null>(catedraInicial);
+  const aspectos = aspectosDe(asigVista);
+  const selector = (sufijo: string, etiqueta: string) => (
+    <SelectorCatedraPaad id={`${uid}-catedra-${sufijo}`} etiqueta={etiqueta} catedras={catedras} value={asigVista} onChange={setAsigVista} />
+  );
   const problemas = validarPaad(contenido, d.comments);
 
   const setLista = (key: ListaPaad, items: string[]) => onUpdatePaad({ ...contenido, listas: { ...contenido.listas, [key]: items } });
@@ -105,7 +119,7 @@ export function PaadEditor({
       n: ap.subapartados.reduce((s, sub) => s + sub.listas.reduce((t, l) => t + contenido.listas[l.key].length, 0), 0),
       sec: ap.numero,
     })),
-    { id: 'horas', label: '8) Distribución horaria', n: totalHoras(contenido), sec: SEC_HORAS },
+    { id: 'horas', label: `${NUMERO_DISTRIBUCION}) Distribución horaria`, n: totalHoras(contenido), sec: SEC_HORAS },
   ];
 
   // Progreso: apartados 1) a 8) con al menos un ítem (o, en el 8, al menos una hora cargada).
@@ -172,12 +186,24 @@ export function PaadEditor({
             <p className="text-xs text-muted">Así se verá el documento oficial con los datos cargados. Para PDF, elegí “Guardar como PDF” al imprimir.</p>
             <BotonImprimir />
           </div>
+          <div className="no-print rounded-xl border border-border bg-surface px-4 py-3">{selector('preview', 'Previsualizar Aspectos Generales según Cátedra:')}</div>
           <div className="rounded-2xl bg-[#e6e8ec] p-3 sm:p-8 print:bg-transparent print:p-0">
             <PaadDocumentoOficial aspectos={aspectos} contenido={contenido} />
           </div>
         </div>
       ) : (
         <>
+          {esPropio && (
+            <div role="note" className="flex items-start gap-3 rounded-xl border border-border bg-soft px-4 py-3 text-xs text-ink">
+              <IconDocs className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <p className="leading-relaxed">
+                Este PAAD (Puntos 1 al 8) es único para todo el Ciclo Lectivo y se vincula automáticamente a todas las asignaturas y carreras en las que
+                participás. Los Aspectos Generales (Carrera, Asignatura, Plan y Función en la cátedra) se generan dinámicamente para cada materia a
+                partir de tu designación en el Equipo de Cátedra y el PAAC correspondiente.
+              </p>
+            </div>
+          )}
+
           {aviso && (
             <AvisoEstado tono={aviso.tono} titulo={aviso.titulo} etiqueta={aviso.etiqueta}>
               {aviso.texto}
@@ -253,33 +279,40 @@ export function PaadEditor({
             </nav>
 
             <div className="space-y-5 lg:col-span-9">
-              {/* Aspectos generales */}
-              <section id={`${uid}-aspectos`} className="scroll-mt-24 rounded-xl border border-border bg-surface p-5 shadow-sm">
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-sm font-bold text-ink">Aspectos Generales</h2>
-                    <p className="mt-0.5 text-[11px] text-muted">Se completan automáticamente con los datos de la cátedra y del docente.</p>
-                  </div>
-                  {catedras.length > 1 && canEdit && (
-                    <label className="flex items-center gap-2 text-[11px] text-muted">
-                      Cátedra de referencia
-                      <select
-                        value={contenido.asignaturaId ?? ''}
-                        onChange={(e) => onUpdatePaad({ ...contenido, asignaturaId: e.target.value || null })}
-                        className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-ink outline-none focus:border-primary"
-                      >
-                        {catedras.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
+              {/* Aspectos generales: datos del docente + proyección por cátedra */}
+              <section id={`${uid}-aspectos`} className="scroll-mt-24 space-y-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
+                <div>
+                  <h2 className="text-sm font-bold text-ink">Aspectos Generales</h2>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    Se generan para cada asignatura a partir de la designación en el Equipo de Cátedra. Elegí una cátedra para ver cómo se presenta el PAAD en ella.
+                  </p>
                 </div>
-                <FichaAspectos aspectos={aspectos} />
-              </section>
 
+                <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+                  {(
+                    [
+                      ['Docente', docenteNombre],
+                      ['DNI', aspectos.dni],
+                      ['Ciclo lectivo', String(d.cycle)],
+                    ] as const
+                  ).map(([k, v]) => (
+                    <div key={k} className="bg-surface px-4 py-2.5">
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-muted">{k}</dt>
+                      <dd className="mt-0.5 text-xs font-medium text-ink">{v || '—'}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted">Asignaturas atendidas en el ciclo</h3>
+                  <TablaCatedrasPaad catedras={catedras} activa={asigVista} onElegir={setAsigVista} />
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+                  {selector('form', 'Previsualizar Aspectos Generales según Cátedra:')}
+                  <FichaAspectos aspectos={aspectos} />
+                </div>
+              </section>
               {/* Apartados 1) a 7) */}
               {APARTADOS_PAAD.map((ap) => (
                 <section key={ap.id} id={`${uid}-${ap.id}`} className="scroll-mt-24 rounded-xl border border-border bg-surface p-5 shadow-sm">
@@ -331,9 +364,15 @@ export function PaadEditor({
                 </section>
               ))}
 
-              {/* Distribución horaria */}
+              {/* 8) Distribución horaria (mismo encabezado numerado que los apartados 1 a 7) */}
               <section id={`${uid}-horas`} className="scroll-mt-24 rounded-xl border border-border bg-surface p-5 shadow-sm">
-                <h2 className="mb-1 text-sm font-bold text-ink">{TITULO_DISTRIBUCION}</h2>
+                <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-ink">
+                  <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-[11px] text-white">
+                    {NUMERO_DISTRIBUCION}
+                  </span>
+                  <span className="sr-only">{NUMERO_DISTRIBUCION}) </span>
+                  {TITULO_DISTRIBUCION}
+                </h2>
                 <p className="mb-4 text-[11px] text-muted">Cargá las horas semanales que dedicás a cada actividad por día. Los subtotales se calculan automáticamente.</p>
                 <ObservationFieldWrapper
                   fKey="horas"

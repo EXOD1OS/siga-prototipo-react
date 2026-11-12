@@ -376,18 +376,19 @@ export function PlanificacionesList({
 
         {/* Tabla */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] border-collapse text-xs">
+          {/* table-fixed + anchos por columna (suman 100%): los encabezados no se mueven al filtrar ni con 0 resultados. */}
+          <table className="w-full table-fixed min-w-[1200px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border">
-                <th scope="col" className={`${thCls} pl-4 sm:pl-5`}>Asignatura</th>
-                <th scope="col" className={thCls}>Carrera</th>
-                <th scope="col" className={thCls}>Ciclo</th>
-                <th scope="col" className={thCls}>Responsable</th>
-                <th scope="col" className={thCls}>PAAC</th>
-                <th scope="col" className={thCls}>Estado</th>
-                <th scope="col" className={thCls}>Dictámenes</th>
-                <th scope="col" className={thCls}>Expediente</th>
-                <th scope="col" className={`${thCls} pr-4 text-right sm:pr-5`}>Informes</th>
+                <th scope="col" className={`${thCls} w-[17%] pl-4 sm:pl-5`}>Asignatura</th>
+                <th scope="col" className={`${thCls} w-[6%]`}>Carrera</th>
+                <th scope="col" className={`${thCls} w-[5%]`}>Ciclo</th>
+                <th scope="col" className={`${thCls} w-[12%]`}>Responsable</th>
+                <th scope="col" className={`${thCls} w-[13%]`}>PAAC</th>
+                <th scope="col" className={`${thCls} w-[13%]`}>Estado</th>
+                <th scope="col" className={`${thCls} w-[14%]`}>Dictámenes</th>
+                <th scope="col" className={`${thCls} w-[11%]`}>Expediente</th>
+                <th scope="col" className={`${thCls} w-[9%] pr-4 text-right sm:pr-5`}>Informes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -396,11 +397,11 @@ export function PlanificacionesList({
                 const obs = d.comments.filter((c) => !c.resolved).length;
                 return (
                   <tr key={d.id} className="transition-colors hover:bg-background">
-                    <td className="px-3 py-3 pl-4 sm:pl-5 max-w-[240px]">
+                    <td className="min-w-0 px-3 py-3 pl-4 sm:pl-5">
                       <span className="block truncate font-semibold text-ink" title={ctx.asig?.nombre}>
                         {ctx.asig?.nombre ?? d.asignaturaId}
                       </span>
-                      <span className="block text-[11px] font-mono text-muted">{ctx.asig?.codigo}</span>
+                      <span className="block truncate text-[11px] font-mono text-muted">{ctx.asig?.codigo}</span>
                     </td>
                     <td className="px-3 py-3">
                       <span
@@ -412,8 +413,12 @@ export function PlanificacionesList({
                       <span className="sr-only"> ({ctx.carrera?.nombre})</span>
                     </td>
                     <td className="px-3 py-3 tabular-nums text-ink">{d.cycle}</td>
-                    <td className="px-3 py-3 text-ink">{fullName(d.owner)}</td>
-                    <td className="px-3 py-3">
+                    <td className="min-w-0 px-3 py-3 text-ink">
+                      <span className="block truncate" title={fullName(d.owner)}>
+                        {fullName(d.owner)}
+                      </span>
+                    </td>
+                    <td className="min-w-0 px-3 py-3">
                       <PaacCelda
                         doc={d}
                         editable={puedeEditar(d)}
@@ -430,11 +435,13 @@ export function PlanificacionesList({
                         <DictamenChip area="Ped." value={dictamenDe(d.pedApproved, d.pedReport)} />
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="min-w-0 px-3 py-3">
                       {d.expediente ? (
-                        <div>
-                          <span className="font-mono font-semibold text-primary">{d.expediente}</span>
-                          <span className="block text-[10px] text-muted">{d.resolucion || 'Resolución en trámite'}</span>
+                        <div className="min-w-0">
+                          <span className="block truncate font-mono font-semibold text-primary" title={d.expediente}>
+                            {d.expediente}
+                          </span>
+                          <span className="block break-words text-[10px] text-muted">{d.resolucion || 'Resolución en trámite'}</span>
                           {d.state === 'FINALIZADO' && (
                             <button type="button" onClick={() => onViewFinal(d.id)} className="text-[10px] font-semibold text-primary hover:underline">
                               Ver documento final
