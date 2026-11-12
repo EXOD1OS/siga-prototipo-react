@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
+import { describirFiltros, type FiltrosPaad } from '../../types/navegacion';
 
 interface Props {
   paads: any[];
@@ -15,7 +16,18 @@ interface Props {
    */
   onOpenPaadDoc: (paadId: string, carreraId?: string) => void;
   onChangeEvalCareer: (paadId: string, newCareerId: string) => void;
+  /** Filtros con los que se abre desde un dashboard (la vista se remonta con cada navegación). */
+  filtrosIniciales?: FiltrosPaad | null;
+  /** Avisa que se descartaron los filtros recibidos desde Inicio. */
+  onRestablecerFiltros?: () => void;
 }
+
+const ESTADO_PAAD_LABEL: Record<string, string> = {
+  BORRADOR: 'Borrador',
+  ENVIADO_A_REVISION: 'En revisión',
+  OBSERVADO: 'Observado',
+  APROBADO: 'PAAD Aprobado',
+};
 
 const pendientesDe = (d: { comments?: { resolved: boolean }[] }) => d.comments?.filter((o) => !o.resolved).length ?? 0;
 
@@ -23,10 +35,32 @@ const pendientesDe = (d: { comments?: { resolved: boolean }[] }) => d.comments?.
  * Bandeja de PAAD (UAP y Dirección de Carrera). El PAAD no tiene doble conformidad:
  * con que una de las dos áreas lo apruebe queda Aprobado. Las decisiones se toman dentro del formulario.
  */
-export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fullName, asigContext, onOpenPaadDoc, onChangeEvalCareer }: Props) {
-  const [search, setSearch] = useState('');
-  const [filterCareer, setFilterCareer] = useState('ALL');
-  const [filterState, setFilterState] = useState('ALL');
+export function PaadsListView({
+  paads,
+  role,
+  carreras,
+  equiposCatedra,
+  cycle,
+  fullName,
+  asigContext,
+  onOpenPaadDoc,
+  onChangeEvalCareer,
+  filtrosIniciales,
+  onRestablecerFiltros,
+}: Props) {
+  const fi = filtrosIniciales ?? null;
+  const [search, setSearch] = useState(fi?.search ?? '');
+  const [filterCareer, setFilterCareer] = useState(fi?.careerId ?? 'ALL');
+  const [filterState, setFilterState] = useState(fi?.state ?? 'ALL');
+  const [desdeInicio, setDesdeInicio] = useState(!!fi);
+
+  const restablecer = () => {
+    setSearch('');
+    setFilterCareer('ALL');
+    setFilterState('ALL');
+    setDesdeInicio(false);
+    onRestablecerFiltros?.();
+  };
 
   const filtered = paads.filter((d) => {
     const misEq = equiposCatedra.filter((e) => e.docenteId === d.owner && e.cicloLectivo === cycle);
@@ -53,6 +87,22 @@ export function PaadsListView({ paads, role, carreras, equiposCatedra, cycle, fu
       </div>
 
       <div className="w-full bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
+        {/* Filtros recibidos desde Inicio */}
+        {desdeInicio && fi && (
+          <div role="status" className="mx-4 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-soft px-3 py-2 text-[11px] text-ink">
+            <span className="font-semibold text-primary">Filtro aplicado desde Inicio</span>
+            <span className="text-muted">
+              {describirFiltros(fi, {
+                carreraSigla: (id) => `Dirección ${carreras.find((c) => c.id === id)?.sigla ?? id}`,
+                estadoLabel: (s) => ESTADO_PAAD_LABEL[s] ?? s,
+              }).join(' · ')}
+            </span>
+            <button type="button" onClick={restablecer} className="ml-auto font-semibold text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+              Restablecer
+            </button>
+          </div>
+        )}
+
         {/* Barra de filtros */}
         <div className="p-4 border-b border-border grid grid-cols-1 sm:grid-cols-3 gap-3 bg-background/50">
           <input

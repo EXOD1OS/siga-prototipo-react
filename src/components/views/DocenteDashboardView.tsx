@@ -16,7 +16,6 @@ interface PaadResumen {
 }
 
 interface Props {
-  role: string;
   uid: string;
   activeUserName: string;
   ciclo: number;
@@ -187,7 +186,6 @@ function BarraApilada({ conteo, total, activo, onActivo }: { conteo: Record<Grup
 
 /** Panel de inicio del docente: su PAAD anual, sus PAAC del ciclo y las observaciones a subsanar. */
 export function DocenteDashboardView({
-  role,
   uid,
   activeUserName,
   ciclo,
@@ -244,7 +242,9 @@ export function DocenteDashboardView({
   const obsResueltas = filas.reduce((s, f) => s + f.d.comments.filter((o) => o.resolved).length, 0);
 
   const progPaad = paad?.paad ? progresoPaad(paad.paad) : { completados: 0, total: 8, pct: 0 };
-  const rolLabel = role === 'DOCENTE_RESPONSABLE' ? 'Docente Responsable' : 'Docente Auxiliar';
+  // Un docente puede ser responsable en una cátedra e integrante en otra: se informa por cátedra.
+  const respCount = misEquipos.filter((e) => e.esResponsable).length;
+  const intCount = misEquipos.length - respCount;
 
   const kpis: { key: Filtro; titulo: string; valor: number; detalle: string; color?: string; Icon: typeof IconDocs }[] = [
     { key: 'todos', titulo: 'Cátedras afectadas', valor: total, detalle: `${responsables} como responsable · ${total - responsables} como integrante`, Icon: IconDocs },
@@ -276,13 +276,9 @@ export function DocenteDashboardView({
       <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">Hola, {activeUserName}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-            <span className="rounded-md bg-soft px-2 py-0.5 font-semibold text-primary">{rolLabel}</span>
-            <span>Ciclo Lectivo {ciclo}</span>
-            <span aria-hidden>·</span>
-            <span>
-              {misEquipos.length} {misEquipos.length === 1 ? 'cátedra asignada' : 'cátedras asignadas'}
-            </span>
+          <p className="mt-1 text-xs text-muted">
+            Ciclo Lectivo {ciclo} · {misEquipos.length} {misEquipos.length === 1 ? 'cátedra asignada' : 'cátedras asignadas'} ({respCount} como responsable ·{' '}
+            {intCount} como integrante)
           </p>
         </div>
         {alertas.length > 0 && primerObservado && (

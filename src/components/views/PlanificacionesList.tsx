@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StatusBadge } from '../shared/StatusBadge';
 import { InformesModal, type AccionesInforme } from '../planificaciones/InformesModal';
 import type { DocPaadResumen } from '../../lib/informes';
+import { describirFiltros, type FiltrosPaac } from '../../types/navegacion';
 import { ROLES_DEPARTAMENTALES, esSesionDocente, puedeVerPlanificacion } from '../../lib/visibilidad';
 import type { AsigContext, Carrera, EquipoCatedra } from '../../types/estructura';
 import {
@@ -39,6 +40,10 @@ interface PlanificacionesListProps {
   onViewFinal: (id: string) => void;
   /** Documentos del sistema (PAAD del equipo, para la hoja oficial de los informes). */
   docs: DocPaadResumen[];
+  /** Filtros con los que se abre desde un dashboard (la vista se remonta con cada navegación). */
+  filtrosIniciales?: FiltrosPaac | null;
+  /** Avisa que se descartaron los filtros recibidos desde Inicio. */
+  onRestablecerFiltros?: () => void;
 }
 
 type Vista = 'activas' | 'historicas';
@@ -134,13 +139,22 @@ export function PlanificacionesList({
   onOpenFormalizarModal,
   onViewFinal,
   docs,
+  filtrosIniciales,
+  onRestablecerFiltros,
 }: PlanificacionesListProps) {
   const esDireccion = role === 'DIRECCION_CARRERA';
-  const [vista, setVista] = useState<Vista>('activas');
-  const [query, setQuery] = useState('');
-  const [filtroCarrera, setFiltroCarrera] = useState(TODOS);
-  const [filtroCiclo, setFiltroCiclo] = useState<number | typeof TODOS>(TODOS);
-  const [filtroEstado, setFiltroEstado] = useState<EstadoPlanif | typeof TODOS>(TODOS);
+  // Filtros iniciales (deep-link desde Inicio). Un estado histórico abre la pestaña de históricas.
+  const fi = filtrosIniciales ?? null;
+  const estadoInicial = (fi?.state as EstadoPlanif | undefined) ?? null;
+  const [vista, setVista] = useState<Vista>(
+    () => fi?.vista ?? (estadoInicial && ESTADOS_HISTORICOS.includes(estadoInicial) ? 'historicas' : 'activas')
+  );
+  const [query, setQuery] = useState(fi?.search ?? '');
+  const [filtroCarrera, setFiltroCarrera] = useState(fi?.careerId ?? TODOS);
+  const [filtroCiclo, setFiltroCiclo] = useState<number | typeof TODOS>(fi?.ciclo ?? TODOS);
+  const [filtroEstado, setFiltroEstado] = useState<EstadoPlanif | typeof TODOS>(estadoInicial ?? TODOS);
+  const [filtroRegimen, setFiltroRegimen] = useState(fi?.regimen ?? TODOS);
+  const [desdeInicio, setDesdeInicio] = useState(!!fi);
   const [pagina, setPagina] = useState(1);
   const [informesId, setInformesId] = useState<string | null>(null);
 
@@ -179,6 +193,7 @@ export function PlanificacionesList({
       if (carreraActiva !== TODOS && ctx.carrera?.id !== carreraActiva) return false;
       if (filtroCiclo !== TODOS && d.cycle !== filtroCiclo) return false;
       if (filtroEstado !== TODOS && d.state !== filtroEstado) return false;
+      if (filtroRegimen !== TODOS && ctx.asig?.regimenDictado !== filtroRegimen) return false;
       if (!q) return true;
       return `${ctx.asig?.nombre ?? ''} ${ctx.asig?.codigo ?? ''} ${fullName(d.owner)}`.toLocaleLowerCase('es').includes(q);
     })
@@ -187,7 +202,8 @@ export function PlanificacionesList({
   const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
   const filas = filtradas.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
-  const hayFiltros = q !== '' || (!carreraFija && filtroCarrera !== TODOS) || filtroCiclo !== TODOS || filtroEstado !== TODOS;
+  const hayFiltros =
+    q !== '' || (!carreraFija && filtroCarrera !== TODOS) || filtroCiclo !== TODOS || filtroEstado !== TODOS || filtroRegimen !== TODOS;
 
   const conReset =
     <T,>(setter: (v: T) => void) =>
@@ -201,7 +217,12 @@ export function PlanificacionesList({
     setFiltroCarrera(TODOS);
     setFiltroCiclo(TODOS);
     setFiltroEstado(TODOS);
+    setFiltroRegimen(TODOS);
     setPagina(1);
+    if (desdeInicio) {
+      setDesdeInicio(false);
+      onRestablecerFiltros?.();
+    }
   };
 
   const cambiarVista = (v: Vista) => {
@@ -272,6 +293,22 @@ export function PlanificacionesList({
             ))}
           </div>
         </div>
+
+        {/* Filtros recibidos desde Inicio */}
+        {desdeInicio && fi && (
+          <div role="status" className="mx-4 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-soft px-3 py-2 text-[11px] text-ink sm:mx-5">
+            <span className="font-semibold text-primary">Filtro aplicado desde Inicio</span>
+            <span className="text-muted">
+              {describirFiltros(fi, {
+                carreraSigla: (id) => carreras.find((c) => c.id === id)?.sigla ?? id,
+                estadoLabel: (s) => ESTADO_LABELS[s as EstadoPlanif] ?? s,
+              }).join(' · ')}
+            </span>
+            <button type="button" onClick={limpiarFiltros} className="ml-auto font-semibold text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+              Restablecer
+            </button>
+          </div>
+        )}
 
         {/* Barra de filtros */}
         <div role="search" aria-label="Filtros de planificaciones" className="grid grid-cols-1 gap-3 border-b border-border px-4 py-3 sm:grid-cols-2 sm:px-5 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-end">

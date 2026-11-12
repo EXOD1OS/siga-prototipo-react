@@ -11,6 +11,11 @@ import { DocumentFormView } from './components/views/DocumentFormView';
 import { ReportEvaluationView } from './components/views/ReportEvaluationView';
 import { LoginView } from './components/views/LoginView';
 import { DocenteDashboardView } from './components/views/DocenteDashboardView';
+import { UapDashboardView } from './components/views/dashboards/UapDashboardView';
+import { DireccionDashboardView } from './components/views/dashboards/DireccionDashboardView';
+import { ConsejoDashboardView } from './components/views/dashboards/ConsejoDashboardView';
+import type { DatosDashboard, NavDashboard } from './components/views/dashboards/datos';
+import type { FiltrosPaac, FiltrosPaad } from './types/navegacion';
 import { CambiarPasswordModal } from './components/shared/CambiarPasswordModal';
 import type { Usuario } from './types/estructura';
 import { AdminEstructuraView } from './components/views/AdminEstructuraView';
@@ -41,6 +46,11 @@ export default function App() {
   const [modalPaadState, setModalPaadState] = useState<{ paadId: string; asigId?: string } | null>(null);
   // Contexto con el que se abre el formulario de un PAAD (cátedra de origen o carrera filtrada en la bandeja).
   const [paadContexto, setPaadContexto] = useState<{ asignaturaId?: string | null; carreraId?: string | null } | null>(null);
+  // Filtros con los que los dashboards abren los listados (deep-linking desde Inicio).
+  const [navFilterPaac, setNavFilterPaac] = useState<FiltrosPaac | null>(null);
+  const [navFilterPaad, setNavFilterPaad] = useState<FiltrosPaad | null>(null);
+  // Cambia en cada navegación: remonta el listado para que arranque con los filtros recibidos.
+  const [navKey, setNavKey] = useState(0);
   const [toast, setToast] = useState<{ id: number; msg: string; tone: ToastTone } | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
@@ -175,6 +185,10 @@ export default function App() {
 
   const handleNavigate = (targetPage: string) => {
     setPaadContexto(null);
+    // La navegación del menú abre los listados sin filtros.
+    setNavFilterPaac(null);
+    setNavFilterPaad(null);
+    setNavKey((k) => k + 1);
     if (targetPage === 'mi-paad') {
       const mp = S.docs.find((d) => d.type === 'PAAD' && d.owner === uid);
       if (mp) {
@@ -184,6 +198,31 @@ export default function App() {
       }
     }
     setPage(targetPage);
+  };
+
+  /**
+   * Abre el listado de planificaciones con filtros. La carrera de la Dirección es la de su sesión
+   * (el listado la fija), así que para ese perfil el filtro de carrera no cambia el alcance.
+   */
+  const goToPlanificaciones = (filters?: FiltrosPaac) => {
+    setNavFilterPaac(filters && Object.keys(filters).length ? filters : null);
+    setNavKey((k) => k + 1);
+    setPage('planificaciones');
+  };
+
+  const goToPaads = (filters?: FiltrosPaad) => {
+    setNavFilterPaad(filters && Object.keys(filters).length ? filters : null);
+    setNavKey((k) => k + 1);
+    setPage('paads');
+  };
+
+  /** Consejo: asigna expediente y Resolución CD y finaliza el PAAC. */
+  const formalizarPaac = (id: string) => {
+    setS((prev) => ({
+      ...prev,
+      docs: prev.docs.map((x) => (x.id === id ? { ...x, expediente: 'EXP-2026-104', resolucion: 'RES-CD-088/26', state: 'FINALIZADO' } : x)),
+    }));
+    showToast('Expediente y Resolución CD asignados: PAAC finalizado.');
   };
 
   const canEditDoc = (d: any) => {
@@ -279,6 +318,30 @@ export default function App() {
   const paacs = S.docs.filter((d) => d.type === 'PAAC');
   const paads = S.docs.filter((d) => d.type === 'PAAD');
   const currentDoc = docBy(activeDocId);
+
+  // Datos y navegación de los dashboards de Inicio.
+  const datosDashboard: DatosDashboard = {
+    nombre: activeUserName,
+    ciclo: S.cycle,
+    paacs,
+    paads,
+    carreras: S.carreras,
+    asigContext,
+    fullName,
+  };
+  const navDashboard: NavDashboard = {
+    goToPlanificaciones,
+    goToPaads,
+    onOpenDoc: (id) => {
+      setPaadContexto(null);
+      setActiveDocId(id);
+      setPage('doc');
+    },
+    onOpenReport: (id) => {
+      setActiveDocId(id);
+      setPage('report');
+    },
+  };
   const modalPaad = modalPaadState ? docBy(modalPaadState.paadId) : null;
 
   const toastEl = toast && <Toast key={toast.id} message={toast.msg} tone={toast.tone} onDone={() => setToast(null)} />;
@@ -330,9 +393,25 @@ export default function App() {
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {page === 'home' && role === 'UAP' && <UapDashboardView datos={datosDashboard} nav={navDashboard} />}
+
+          {page === 'home' && role === 'DIRECCION_CARRERA' && (
+            <DireccionDashboardView
+              datos={datosDashboard}
+              nav={navDashboard}
+              careerId={careerId}
+              asignaturas={S.asignaturas}
+              planes={S.planes}
+              equipos={S.equiposCatedra}
+            />
+          )}
+
+          {page === 'home' && role === 'CONSEJO_DEPARTAMENTAL' && (
+            <ConsejoDashboardView datos={datosDashboard} nav={navDashboard} onFormalizar={formalizarPaac} />
+          )}
+
           {page === 'home' && role.startsWith('DOCENTE') && (
             <DocenteDashboardView
-              role={role}
               uid={uid}
               activeUserName={activeUserName}
               ciclo={S.cycle}
@@ -354,8 +433,11 @@ export default function App() {
             />
           )}
 
-          {(page === 'planificaciones' || (page === 'home' && !role.startsWith('DOCENTE'))) && (
+          {(page === 'planificaciones' || (page === 'home' && role === 'ADMINISTRADOR')) && (
             <PlanificacionesList
+              key={`paac-${navKey}`}
+              filtrosIniciales={page === 'planificaciones' ? navFilterPaac : null}
+              onRestablecerFiltros={() => setNavFilterPaac(null)}
               paacs={paacs}
               role={role}
               uid={uid}
@@ -376,14 +458,7 @@ export default function App() {
                   docs: prev.docs.map((x) => (x.id === id ? { ...x, state: 'ELEVADO_AL_CONSEJO' } : x)),
                 }))
               }
-              onOpenFormalizarModal={(id: string) =>
-                setS((prev) => ({
-                  ...prev,
-                  docs: prev.docs.map((x) =>
-                    x.id === id ? { ...x, expediente: 'EXP-2026-104', resolucion: 'RES-CD-088/26', state: 'FINALIZADO' } : x
-                  ),
-                }))
-              }
+              onOpenFormalizarModal={formalizarPaac}
               onViewFinal={(id: string) => {
                 setActiveDocId(id);
                 setPage('doc');
@@ -395,6 +470,9 @@ export default function App() {
           {/* BANDEJA DE PAADS: EXCLUSIVA PARA DIRECCIÓN, UAP, CONSEJO Y ADMIN (Oculta a profesores) */}
           {page === 'paads' && !role.startsWith('DOCENTE') && (
             <PaadsListView
+              key={`paad-${navKey}`}
+              filtrosIniciales={navFilterPaad}
+              onRestablecerFiltros={() => setNavFilterPaad(null)}
               paads={paads}
               role={role}
               carreras={S.carreras}
